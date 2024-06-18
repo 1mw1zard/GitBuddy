@@ -12,7 +12,7 @@ commit messages, streamline your workflow, and enhance your productivity.
 
 - **AI-Powered Commit Messages**: Generate intelligent and context-aware commit messages based on your code changes.
 - **Customizable Models**: Support for using different AI models, not only GPT-3.5.
-- - **Vendor Flexibility**: Compatible with various AI service providers.
+- **Multiple Vendor Flexibility**: Compatible with various AI service providers.
     + [x] [DeepSeek](https://www.deepseek.com/)
     + [ ] [OpenAI ChatGPT](https://platform.openai.com/docs/guides/gpt/chat-completions-api)
     + [ ] [Anthropic Claude](https://anthropic.com)
