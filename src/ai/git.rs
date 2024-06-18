@@ -6,12 +6,10 @@ pub fn git_stage_filenames() -> Vec<String> {
         return vec![];
     }
 
-    // 把output转换成 vec
-    let mut filenames = String::from_utf8(output.stdout).unwrap()
+    return String::from_utf8(output.stdout).unwrap()
         .split('\n')
         .map_while(|s| if s.is_empty() { None } else { Some(s.to_string()) })
         .collect::<Vec<_>>();
-    return filenames;
 }
 
 pub fn git_stage_diff() -> String {
@@ -22,7 +20,7 @@ pub fn git_stage_diff() -> String {
         return "".to_string();
     }
 
-    return String::from_utf8(output.stdout).unwrap();
+    String::from_utf8(output.stdout).unwrap()
 }
 
 pub fn git_commit(message: &str) {
