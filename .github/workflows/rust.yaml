@@ -78,6 +78,7 @@ jobs:
     name: 'publish'
     needs: [ build-linux, build-windows ]
     environment: cargo
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@master
 
