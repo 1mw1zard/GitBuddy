@@ -65,3 +65,4 @@ gitbuddy ai
 - [ ] Better prompts.
 - [ ] Enhance the User Interface.
 - [ ] **Install** for using GitBuddy by **Git Hooks** (without `gitbuddy ai`).
+- [ ] Submit a single request to receive multiple options for users to select from. (consuming more tokens)
