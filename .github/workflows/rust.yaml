@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+
 
 jobs:
   build-linux:
@@ -42,12 +40,6 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Upload binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: gitbuddy-linux
-          path: target/release/gitbuddy
-
   build-windows:
     runs-on: windows-latest
 
@@ -80,9 +72,3 @@ jobs:
 
       - name: Build
         run: cargo build --release
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: gitbuddy-windows
-          path: target/release/gitbuddy.exe

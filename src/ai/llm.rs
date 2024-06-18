@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use reqwest::blocking::Client;
-use serde_json::{json, Value};
+use serde_json::{json};
 use std::io::{Error, ErrorKind, Result, Write};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -43,7 +42,7 @@ pub fn openai_request(diff_content: &str) -> Result<String> {
     // 从环境变量检查是否存在openai_api_key
     let openai_api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
 
-    let mut openai_url = String::from("https://api.deepseek.com");
+    let openai_url = String::from("https://api.deepseek.com");
     let openai_model = String::from("deepseek-chat");
 
     if openai_api_key.is_empty() || openai_url.is_empty() {
@@ -75,7 +74,7 @@ pub fn openai_request(diff_content: &str) -> Result<String> {
         .expect("Error sending request");
 
     return if response.status().is_success() {
-        let response_json = OpenAIResponse {
+        let _response_json = OpenAIResponse {
             id: "".to_string(),
             model: "".to_string(),
             object: "".to_string(),
