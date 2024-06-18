@@ -8,7 +8,6 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     name: 'publish'
-    needs: [ build-linux, build-windows ]
     environment: cargo
     steps:
       - uses: actions/checkout@master
