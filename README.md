@@ -56,8 +56,12 @@ Using GitBuddy is straightforward. After making your changes, run the following 
 gitbuddy ai
 ```
 
-## Supported AI Models
+## Roadmap
 
-- OpenAI
-- [DeepSeek](https://www.deepseek.com/)
-- [Llama2](https://github.com/facebookresearch/llama)
+- [ ] Support for more AI models.
+- [ ] Add statistics and analytics for GitBuddy usage of kinds of Models.
+- [ ] Easy configuration.
+- [ ] Support Proxy.
+- [ ] Better prompts.
+- [ ] Enhance the User Interface.
+- [ ] **Install** for using GitBuddy by **Git Hooks** (without `gitbuddy ai`).
