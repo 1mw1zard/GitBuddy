@@ -12,7 +12,7 @@ commit messages, streamline your workflow, and enhance your productivity.
 
 - **AI-Powered Commit Messages**: Generate intelligent and context-aware commit messages based on your code changes.
 - **Customizable Models**: Support for using different AI models, not only GPT-3.5.
-- - **Vendor Flexibility**: Compatible with various AI service providers.
+- **Multiple Vendor Flexibility**: Compatible with various AI service providers.
     + [x] [DeepSeek](https://www.deepseek.com/)
     + [ ] [OpenAI ChatGPT](https://platform.openai.com/docs/guides/gpt/chat-completions-api)
     + [ ] [Anthropic Claude](https://anthropic.com)
@@ -56,8 +56,13 @@ Using GitBuddy is straightforward. After making your changes, run the following 
 gitbuddy ai
 ```
 
-## Supported AI Models
+## Roadmap
 
-- OpenAI
-- [DeepSeek](https://www.deepseek.com/)
-- [Llama2](https://github.com/facebookresearch/llama)
+- [ ] Support for more AI models.
+- [ ] Add statistics and analytics for GitBuddy usage of kinds of Models.
+- [ ] Easy configuration.
+- [ ] Support Proxy.
+- [ ] Better prompts.
+- [ ] Enhance the User Interface.
+- [ ] **Install** for using GitBuddy by **Git Hooks** (without `gitbuddy ai`).
+- [ ] Submit a single request to receive multiple options for users to select from. (consuming more tokens)
