@@ -1,9 +1,9 @@
 use clap::Command;
-use clap::Parser;
 
 use crate::ai::{get_command, handle_command};
 
 mod ai;
+mod llm;
 
 fn main() {
     let matches = Command::new("gitbuddy")
