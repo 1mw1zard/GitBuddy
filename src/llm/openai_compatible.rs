@@ -10,9 +10,12 @@ pub(crate) struct OpenAICompatible {
 }
 
 impl OpenAICompatible {
+    #[allow(dead_code)]
     pub(crate) fn set_api_key(&mut self, api_key: &str) {
         self.api_key = Some(api_key.to_string());
     }
+
+    #[allow(dead_code)]
     pub(crate) fn request(&self, diff_content: &str) -> Result<String> {
         let client = reqwest::blocking::Client::new();
 
@@ -75,6 +78,7 @@ impl Default for OpenAICompatibleBuilder {
 }
 
 impl OpenAICompatibleBuilder {
+    #[allow(dead_code)]
     /// Set the name of the model.
     pub(crate) fn url(mut self, url: String) -> OpenAICompatibleBuilder {
         // Set the name on the builder itself, and return the builder by value.
@@ -82,12 +86,14 @@ impl OpenAICompatibleBuilder {
         self
     }
 
+    #[allow(dead_code)]
     /// Set the name of the model.
     pub(crate) fn use_model(mut self, model: String) -> OpenAICompatibleBuilder {
         self.default_model = model;
         self
     }
 
+    #[allow(dead_code)]
     pub fn build(self) -> OpenAICompatible {
         OpenAICompatible {
             url: self.url,
