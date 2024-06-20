@@ -20,13 +20,14 @@ pub fn git_stage_diff() -> String {
         .map(|path| format!(":(exclude){}", path))
         .collect();
 
-    let commnad = Command::new("git")
-        .args(["diff", "--cached", "--no-ext-diff", "--diff-algorithm=minimal"]);
+    let mut command = Command::new("git");
+    command.args(&["diff", "--cached", "--no-ext-diff", "--diff-algorithm=minimal"]);
+
     for path in exclude_path {
-        commnad.arg(path);
+        command.arg(path);
     }
 
-    let output = commnad.output().unwrap();
+    let output = command.output().unwrap();
 
     if !output.status.success() {
         return "".to_string();
