@@ -36,13 +36,14 @@ gitbuddy ai
 
 ## Support models
 
-| Vendor    | Model(s)                        | Support |
-|-----------|---------------------------------|:-------:|
-| DeepSeek  | deepseek-chat                   |   yes   |
-| OpenAI    | gpt-3.5-turbo                   |   no    |
-| ByteDance | Doubao-lite-4k<br>Doubao-pro-4k |   no    |
-| Baidu     | ERNIE 4.0                       |   no    |
-| Alibaba   | qwen-turbo                      |   no    |
+| Vendor      | Model(s)                        | Support |
+|-------------|---------------------------------|:-------:|
+| DeepSeek    | deepseek-chat                   |   yes   |
+| OpenAI      | gpt-3.5-turbo                   |   no    |
+| ByteDance   | Doubao-lite-4k<br>Doubao-pro-4k |   no    |
+| Baidu       | ERNIE 4.0                       |   no    |
+| Alibaba     | qwen-turbo                      |   no    |
+| Moonshot AI | moonshot-v1-8k                  |   no    |
 
 ## Roadmap
 
