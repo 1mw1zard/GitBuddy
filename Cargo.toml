@@ -16,3 +16,4 @@ serde = { version = "1.0.203", features = ["derive"] }
 colored = "2.1.0"
 rust-embed = { version = "8.4.0", features = ["include-exclude"] }
 anyhow = "1.0.86"
+dirs = "5.0.1"

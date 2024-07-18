@@ -4,6 +4,7 @@ use crate::ai::{get_command, handle_command};
 
 mod ai;
 mod llm;
+mod config;
 
 fn main() {
     let matches = Command::new("gitbuddy")
