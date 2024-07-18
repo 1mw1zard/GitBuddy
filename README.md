@@ -58,6 +58,7 @@ gitbuddy ai
 
 ## Roadmap
 
+- [ ] Using configuration file instead of environment variables.
 - [ ] Support for more AI models.
 - [ ] Add statistics and analytics for GitBuddy usage of kinds of Models.
 - [ ] Easy configuration.
