@@ -32,12 +32,13 @@ pub fn handler(dry_run: bool) {
     let duration = start.elapsed();
 
     let usage_message = format!(
-        "Completed!  duration={:?} - Usage={}(completion={}, prompt={})]",
+        "duration={:?} - Usage={}(completion={}, prompt={})]",
         duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
-    println!("{}", usage_message.green());
+
+    println!("{}  {}", "Completed!".green(), usage_message.truecolor(128, 128, 128));
 
     if !llm::confirm_commit(llm_result.commit_message.as_str()) {
-        println!("cancel commit");
+        println!("{}", "Cancel commit".red());
         return;
     }
 

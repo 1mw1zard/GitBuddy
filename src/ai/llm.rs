@@ -119,9 +119,9 @@ pub fn openai_request(diff_content: &str) -> Result<LLMResult> {
 }
 
 pub fn confirm_commit(commit_message: &str) -> bool {
-    // 屏幕上打印提交信息，询问用户是否确认提交，如果 回车 及提交，否则取消
+    println!("--------------------------------------");
     println!("{}", commit_message.cyan().bold());
-
+    println!("--------------------------------------");
     print!("Are you sure you want to commit? (Y/n) ");
     let mut input = String::new();
 

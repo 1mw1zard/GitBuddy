@@ -50,10 +50,10 @@ fn ignore_filenames() -> Vec<&'static str> {
     ]
 }
 
-
+/// Commits the changes to the repository.
 pub fn git_commit(message: &str, dry_run: bool) {
     if dry_run {
-        println!("{}", "-> commit success!!!".green());
+        println!("{}", "Commit success!!! (with dry-run)".green().bold());
         return;
     }
 
@@ -61,7 +61,7 @@ pub fn git_commit(message: &str, dry_run: bool) {
         .args(["commit", "-m", message]).output().unwrap();
 
     if output.status.success() {
-        println!("{}", "-> commit success!!!".green())
+        println!("{}", "Commit success!!!".green().bold())
     } else {
         println!("commit failed")
     }
