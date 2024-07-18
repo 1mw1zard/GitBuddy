@@ -1,6 +1,6 @@
 [package]
 name = "gitbuddy"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Jianbang <fujianbang0ops@gmail.com>"]
 description = "An AI-driven tool designed to simplify your Git commit process."
@@ -16,3 +16,4 @@ serde = { version = "1.0.203", features = ["derive"] }
 colored = "2.1.0"
 rust-embed = { version = "8.4.0", features = ["include-exclude"] }
 anyhow = "1.0.86"
+dirs = "5.0.1"

@@ -1,22 +1,42 @@
-use clap::Command;
+use clap::{Parser, Subcommand};
 
-use crate::ai::{get_command, handle_command};
+use crate::ai::handler;
 
 mod ai;
 mod llm;
+mod config;
+
+#[derive(Parser)]
+#[command(
+    author,
+    version,
+    about,
+    long_about = "An AI-driven tool designed to simplify your Git commit process."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Generate a commit message based on the current state of the repository
+    Ai {
+        /// test argument, generate commit message but not commit
+        #[arg(short, long)]
+        dry_run: bool,
+    },
+}
+
 
 fn main() {
-    let matches = Command::new("gitbuddy")
-        .version("0.1")
-        .about("An AI-driven tool designed to simplify your Git commit process.")
-        .subcommands(vec![get_command()])
-        .get_matches();
+    let cli = Cli::parse();
 
-    match matches.subcommand() {
-        Some(("ai", m)) => {
-            handle_command(m)
+    match &cli.command {
+        Some(Commands::Ai { dry_run }) => {
+            handler(*dry_run);
         }
-        _ => {
+        None => {
             println!("No subcommand provided.");
         }
     }
