@@ -1,27 +1,19 @@
 mod git;
 mod llm;
 
-use clap::Command;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
+use colored::Colorize;
 use crate::ai::git::{git_stage_diff, git_stage_filenames};
 
-/// return a clap::Command
-pub fn get_command() -> Command {
-    let matches = Command::new("ai")
-        .about("Using LLM to generate commits");
-
-    matches
-}
-
-pub fn handle_command(_: &clap::ArgMatches) {
-    // 检查当前目录是否为git目录
+pub fn handler(dry_run: bool) {
     if !is_git_directory() {
-        println!("当前目录不是git目录");
+        println!("Not git directory");
         return;
     }
 
-    // 检查是否安装git
     if !is_git_installed() {
-        println!("请安装git");
+        println!("Please install git");
         return;
     }
 
@@ -33,16 +25,23 @@ pub fn handle_command(_: &clap::ArgMatches) {
 
     let diff_content = git_stage_diff();
 
-    let commit_text = llm::openai_request(&diff_content).unwrap();
+    println!("Generating commit message by LLM...");
 
-    // 交互式确认是否生成
-    if !llm::confirm_commit(&commit_text) {
-        println!("用户取消提交");
+    let start = Instant::now();
+    let llm_result = llm::openai_request(&diff_content).unwrap();
+    let duration = start.elapsed();
+
+    let usage_message = format!(
+        "Completed!  duration={:?} - Usage={}(completion={}, prompt={})]",
+        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
+    println!("{}", usage_message.green());
+
+    if !llm::confirm_commit(llm_result.commit_message.as_str()) {
+        println!("cancel commit");
         return;
     }
 
-    // 提交代码
-    git::git_commit(&commit_text);
+    git::git_commit(llm_result.commit_message.trim(), dry_run);
 }
 
 fn is_git_directory() -> bool {

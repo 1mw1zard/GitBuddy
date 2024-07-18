@@ -1,7 +1,8 @@
 use std::process::Command;
+use colored::Colorize;
 
 pub fn git_stage_filenames() -> Vec<String> {
-    let output = std::process::Command::new("git")
+    let output = Command::new("git")
         .args(["diff", "--cached", "--no-ext-diff", "--diff-algorithm=minimal", "--name-only"]).output().unwrap();
 
     if !output.status.success() {
@@ -50,12 +51,17 @@ fn ignore_filenames() -> Vec<&'static str> {
 }
 
 
-pub fn git_commit(message: &str) {
-    let output = std::process::Command::new("git")
+pub fn git_commit(message: &str, dry_run: bool) {
+    if dry_run {
+        println!("{}", "-> commit success!!!".green());
+        return;
+    }
+
+    let output = Command::new("git")
         .args(["commit", "-m", message]).output().unwrap();
 
     if output.status.success() {
-        println!("commit success")
+        println!("{}", "-> commit success!!!".green())
     } else {
         println!("commit failed")
     }
