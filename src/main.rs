@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use crate::ai::handler;
-
 mod ai;
 mod llm;
 mod config;
@@ -26,6 +24,7 @@ enum Commands {
         #[arg(short, long)]
         dry_run: bool,
     },
+    Config {},
 }
 
 
@@ -34,7 +33,10 @@ fn main() {
 
     match &cli.command {
         Some(Commands::Ai { dry_run }) => {
-            handler(*dry_run);
+            ai::handler(*dry_run);
+        }
+        Some(Commands::Config {}) => {
+            config::handler();
         }
         None => {
             println!("No subcommand provided.");
