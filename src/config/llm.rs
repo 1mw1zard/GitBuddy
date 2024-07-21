@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 
 /// TODO 
 const DEFAULT_DIR: &str = ".gitbuddy";
@@ -14,12 +15,13 @@ fn get_config_dir() -> Option<PathBuf> {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum UseModel {
+    DeepSeek(OpenAILikeParams),
+}
 
-
-// 定义配置文件信息
-struct Config {}
-
-#[cfg(test)]
-mod test {
-
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct OpenAILikeParams {
+    pub model: String,
+    pub api_key: String,
 }
