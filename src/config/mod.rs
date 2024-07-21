@@ -1,4 +1,5 @@
 mod llm;
+mod storage;
 
 use serde::{Deserialize, Serialize};
 use llm::UseModel;
