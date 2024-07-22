@@ -3,11 +3,39 @@ mod storage;
 
 use std::any::Any;
 use serde::{Deserialize, Serialize};
-use llm::UseModel;
-use anyhow::Result;
+use llm::{UseModel, OpenAILikeParams};
+use anyhow::{anyhow, Result};
+use clap::Subcommand;
+use crate::llm::PromptModel;
 
-pub fn handler() {
-    println!("Hello, world!");
+pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
+    let mut config: GlobalConfig = match GlobalConfig::load() {
+        None => {
+            GlobalConfig::new()
+        }
+        Some(cfg) => { cfg }
+    };
+
+    let openai_like_params = OpenAILikeParams {
+        model: model.to_string(),
+        api_key: api_key.to_string(),
+    };
+
+    let model: UseModel = match vendor {
+        PromptModel::DeepSeek => {
+            UseModel::DeepSeek(openai_like_params)
+        }
+        PromptModel::OpenAI => {
+            UseModel::OpenAI(openai_like_params)
+        }
+    };
+
+    config.set_model(model);
+    config.save().expect("Failed to save config.");
+
+    println!("Config saved.");
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,7 +50,7 @@ impl GlobalConfig {
         }
     }
 
-    /// set use model
+    /// Set use model
     pub fn set_model(&mut self, model: UseModel) {
         self.model = Some(model);
     }
@@ -34,10 +62,16 @@ impl GlobalConfig {
         Ok(())
     }
 
-    pub fn load() -> Result<Self> {
-        let content = storage::read_config()?;
-        let config: GlobalConfig = toml::from_str(content.as_str())?;
-        Ok(config)
+    /// load config from file
+    pub fn load() -> Option<Self> {
+        let content = storage::read_config().unwrap_or_default();
+        match toml::from_str(content.as_str()) {
+            Ok(config) => Some(config),
+            Err(err) => {
+                eprintln!("load config error: {}", err);
+                None
+            }
+        }
     }
 }
 

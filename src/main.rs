@@ -24,7 +24,14 @@ enum Commands {
         #[arg(short, long)]
         dry_run: bool,
     },
-    Config {},
+    Config {
+        #[arg(value_enum)]
+        vendor: llm::PromptModel,
+        #[arg(short, long)]
+        api_key: String,
+        #[arg(short, long)]
+        model: Option<String>,
+    },
 }
 
 
@@ -35,8 +42,14 @@ fn main() {
         Some(Commands::Ai { dry_run }) => {
             ai::handler(*dry_run);
         }
-        Some(Commands::Config {}) => {
-            config::handler();
+        Some(Commands::Config { vendor, api_key, model }) => {
+            let model = if let Some(model) = model {
+                model.to_string()
+            } else {
+                vendor.default_model().to_string()
+            };
+
+            config::handler(&vendor, api_key, model.as_str()).unwrap();
         }
         None => {
             println!("No subcommand provided.");

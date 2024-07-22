@@ -49,14 +49,19 @@ pub(crate) fn save_config(content: &str) -> Result<()> {
 }
 
 /// read config file from local config dir
-pub(crate) fn read_config() -> Result<String> {
-    let dir = get_config_dir().context("Error getting config dir")?;
+pub(crate) fn read_config() -> Option<String> {
+    let dir = get_config_dir()?;
 
     let config_file_name = dir.join(CONFIG_FILE_NAME);
 
-    let content = fs::read_to_string(&config_file_name).context("Error reading config file")?;
-
-    Ok(content)
+    match fs::read_to_string(&config_file_name) {
+        Ok(content) => {
+            Some(content)
+        },
+        Err(e) => {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,15 +1,31 @@
 mod openai_compatible;
 
 use anyhow::Result;
+use clap::builder::Str;
+use clap::ValueEnum;
 
-#[allow(dead_code)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 /// Prompt model
-enum PromptModel {
+pub enum PromptModel {
+    #[clap(name = "openai")]
     OpenAI,
+    #[clap(name = "deepseek")]
     DeepSeek,
 }
 
-#[allow(dead_code)]
+impl PromptModel {
+    pub fn default_model(&self) -> String {
+        return match self {
+            PromptModel::OpenAI => {
+                "gpt-3.5-turbo".to_string()
+            }
+            PromptModel::DeepSeek => {
+                "deepseek-chat".to_string()
+            }
+        }
+    }
+}
+
 fn get_commit_message(model: PromptModel, api_key: &str, diff_content: &str) -> Result<String> {
     let builder = match model {
         PromptModel::OpenAI => openai_compatible::OpenAICompatibleBuilder::default(),
