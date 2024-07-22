@@ -1,7 +1,9 @@
 mod openai_compatible;
+mod openai_compatible_builder;
 
 use anyhow::Result;
 use clap::ValueEnum;
+use openai_compatible_builder::OpenAICompatibleBuilder;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 /// Prompt model
@@ -25,21 +27,14 @@ impl PromptModel {
     }
 }
 
-fn get_commit_message(model: PromptModel, api_key: &str, diff_content: &str) -> Result<String> {
-    let builder = match model {
-        PromptModel::OpenAI => openai_compatible::OpenAICompatibleBuilder::default(),
-        PromptModel::DeepSeek => {
-            openai_compatible::OpenAICompatibleBuilder::default().
-                url(String::from("https://api.deepseek.com")).
-                use_model(String::from("deepseek-chat"))
-        }
-    };
+// pub fn openai_request(diff_content: &str) -> std::io::Result<LLMResult> {
+// }
 
 
-    // TODO update the prompt or something else
+fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<String> {
+    let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
+    // generate http request
     let mut m = builder.build();
-    m.set_api_key(api_key);
-
     m.request(diff_content)
 }

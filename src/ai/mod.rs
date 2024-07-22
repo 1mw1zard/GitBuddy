@@ -5,7 +5,7 @@ use colored::Colorize;
 use crate::ai::git::{git_stage_diff, git_stage_filenames};
 
 mod git;
-mod llm;
+pub mod llm;
 
 pub fn handler(dry_run: bool) {
     if !is_git_directory() {
