@@ -1,7 +1,6 @@
 mod openai_compatible;
 
 use anyhow::Result;
-use clap::builder::Str;
 use clap::ValueEnum;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -22,7 +21,7 @@ impl PromptModel {
             PromptModel::DeepSeek => {
                 "deepseek-chat".to_string()
             }
-        }
+        };
     }
 }
 

@@ -1,12 +1,15 @@
+use std::any::Any;
+
+use anyhow::Result;
+use clap::Subcommand;
+use serde::{Deserialize, Serialize};
+
+use llm::{OpenAILikeParams, UseModel};
+
+use crate::llm::PromptModel;
+
 mod llm;
 mod storage;
-
-use std::any::Any;
-use serde::{Deserialize, Serialize};
-use llm::{UseModel, OpenAILikeParams};
-use anyhow::{anyhow, Result};
-use clap::Subcommand;
-use crate::llm::PromptModel;
 
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
     let mut config: GlobalConfig = match GlobalConfig::load() {
@@ -79,6 +82,7 @@ impl GlobalConfig {
 #[cfg(test)]
 mod test {
     use crate::config::llm::OpenAILikeParams;
+
     use super::*;
 
     #[test]
