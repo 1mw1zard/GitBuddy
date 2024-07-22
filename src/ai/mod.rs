@@ -1,10 +1,11 @@
+use std::time::Instant;
+
+use colored::Colorize;
+
+use crate::ai::git::{git_stage_diff, git_stage_filenames};
+
 mod git;
 mod llm;
-
-use std::thread::sleep;
-use std::time::{Duration, Instant};
-use colored::Colorize;
-use crate::ai::git::{git_stage_diff, git_stage_filenames};
 
 pub fn handler(dry_run: bool) {
     if !is_git_directory() {

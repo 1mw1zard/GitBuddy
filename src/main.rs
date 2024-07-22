@@ -27,9 +27,9 @@ enum Commands {
     Config {
         #[arg(value_enum)]
         vendor: llm::PromptModel,
-        #[arg(short, long)]
+        #[arg(long)]
         api_key: String,
-        #[arg(short, long)]
+        #[arg(long)]
         model: Option<String>,
     },
 }
