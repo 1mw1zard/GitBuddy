@@ -1,5 +1,6 @@
+use std::fs;
 use std::path::{Path, PathBuf};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 
 const DEFAULT_DIR: &str = ".config/gitbuddy";
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -15,7 +16,8 @@ fn get_config_dir() -> Option<PathBuf> {
     }
 }
 
-pub fn save_config(content: &str) -> Result<()> {
+/// save config file to local config dir
+pub(crate) fn save_config(content: &str) -> Result<()> {
     let dir = get_config_dir();
 
     if dir.is_none() {
@@ -46,6 +48,16 @@ pub fn save_config(content: &str) -> Result<()> {
     }
 }
 
+/// read config file from local config dir
+pub(crate) fn read_config() -> Result<String> {
+    let dir = get_config_dir().context("Error getting config dir")?;
+
+    let config_file_name = dir.join(CONFIG_FILE_NAME);
+
+    let content = fs::read_to_string(&config_file_name).context("Error reading config file")?;
+
+    Ok(content)
+}
 
 #[cfg(test)]
 mod test {
@@ -58,7 +70,7 @@ mod test {
 
         println!("config dir: {:?}", dir)
     }
-    
+
     #[test]
     fn test_save_config() {
         let content = r#"
@@ -66,7 +78,7 @@ mod test {
 model = "gpt-3.5-turbo"
 api_key = "sk-12345678"
         "#;
-        
+
         let result = save_config(content);
         assert!(result.is_ok());
     }
