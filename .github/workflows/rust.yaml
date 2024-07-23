@@ -43,6 +43,7 @@ jobs:
         run: cargo build --release
   publish:
     needs: [ build ]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     name: 'publish'
     environment: cargo

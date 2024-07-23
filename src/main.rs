@@ -49,7 +49,7 @@ fn main() {
                 vendor.default_model().to_string()
             };
 
-            config::handler(&vendor, api_key, model.as_str()).unwrap();
+            config::handler(vendor, api_key, model.as_str()).unwrap();
         }
         None => {
             println!("No subcommand provided.");
