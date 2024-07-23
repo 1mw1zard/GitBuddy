@@ -26,6 +26,20 @@ To get started with GitBuddy, follow these simple steps:
 cargo install gitbuddy
 ```
 
+### Configuration
+
+To use GitBuddy, simply run the following command in your terminal:
+
+**Using default model**
+```sh
+gitbuddy config --api-key <your-api-key> deepseek
+```
+
+**Using custom model**
+```sh
+gitbuddy config --api-key <your-api-key> --model gpt-4o openai
+```
+
 ## Usage
 
 Using GitBuddy is straightforward. After making your changes, run the following command to generate a commit message:
@@ -48,7 +62,7 @@ gitbuddy ai
 ## Roadmap
 
 - [x] Enhance the User Interface.
-- [ ] Using configuration file instead of environment variables.
+- [x] Using configuration file instead of environment variables.
 - [ ] Support for more AI models.
 - [ ] Add statistics and analytics for GitBuddy usage of kinds of Models.
 - [ ] Support http proxy.
