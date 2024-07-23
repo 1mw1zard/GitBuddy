@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use crate::ai::handler;
-
 mod ai;
 mod llm;
 mod config;
@@ -26,6 +24,14 @@ enum Commands {
         #[arg(short, long)]
         dry_run: bool,
     },
+    Config {
+        #[arg(value_enum)]
+        vendor: llm::PromptModel,
+        #[arg(long)]
+        api_key: String,
+        #[arg(long)]
+        model: Option<String>,
+    },
 }
 
 
@@ -34,7 +40,16 @@ fn main() {
 
     match &cli.command {
         Some(Commands::Ai { dry_run }) => {
-            handler(*dry_run);
+            ai::handler(*dry_run);
+        }
+        Some(Commands::Config { vendor, api_key, model }) => {
+            let model = if let Some(model) = model {
+                model.to_string()
+            } else {
+                vendor.default_model().to_string()
+            };
+
+            config::handler(&vendor, api_key, model.as_str()).unwrap();
         }
         None => {
             println!("No subcommand provided.");

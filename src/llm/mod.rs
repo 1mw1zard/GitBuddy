@@ -1,30 +1,105 @@
 mod openai_compatible;
+mod openai_compatible_builder;
 
-use anyhow::Result;
+use std::io::Write;
+use anyhow::{anyhow, Result};
+use clap::ValueEnum;
+use colored::Colorize;
+use openai_compatible_builder::OpenAICompatibleBuilder;
+use crate::config;
+use crate::config::UseModel;
 
-#[allow(dead_code)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 /// Prompt model
-enum PromptModel {
+pub enum PromptModel {
+    #[clap(name = "openai")]
     OpenAI,
+    #[clap(name = "deepseek")]
     DeepSeek,
 }
 
-#[allow(dead_code)]
-fn get_commit_message(model: PromptModel, api_key: &str, diff_content: &str) -> Result<String> {
-    let builder = match model {
-        PromptModel::OpenAI => openai_compatible::OpenAICompatibleBuilder::default(),
-        PromptModel::DeepSeek => {
-            openai_compatible::OpenAICompatibleBuilder::default().
-                url(String::from("https://api.deepseek.com")).
-                use_model(String::from("deepseek-chat"))
+impl PromptModel {
+    pub fn default_model(&self) -> String {
+        return match self {
+            PromptModel::OpenAI => {
+                "gpt-3.5-turbo".to_string()
+            }
+            PromptModel::DeepSeek => {
+                "deepseek-chat".to_string()
+            }
+        };
+    }
+}
+
+
+#[derive(Debug)]
+pub struct LLMResult {
+    pub commit_message: String,
+    pub completion_tokens: i64,
+    pub prompt_tokens: i64,
+    pub total_tokens: i64,
+}
+
+
+struct RequestsWrap {
+    vendor: PromptModel,
+    model: String,
+    api_key: String,
+}
+
+impl RequestsWrap {
+    fn new(vendor: PromptModel, model: String, api_key: String) -> Self {
+        RequestsWrap {
+            vendor,
+            model,
+            api_key,
+        }
+    }
+}
+
+
+pub fn llm_request(diff_content: &str) -> Result<LLMResult> {
+    let config = config::get_config()?;
+
+    let model = match config.model {
+        Some(model) => model,
+        None => {
+            return Err(anyhow!("No model selected"));
         }
     };
 
+    let RequestsWrap { vendor, model, api_key } =
+        match model {
+            UseModel::DeepSeek(params) => {
+                RequestsWrap::new(PromptModel::DeepSeek, params.model, params.api_key)
+            }
+            UseModel::OpenAI(params) => {
+                RequestsWrap::new(PromptModel::OpenAI, params.model, params.api_key)
+            }
+        };
 
-    // TODO update the prompt or something else
+    get_commit_message(vendor, model.as_str(), api_key.as_str(), diff_content)
+}
 
-    let mut m = builder.build();
-    m.set_api_key(api_key);
+fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<LLMResult> {
+    let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
-    m.request(diff_content)
+    // generate http request
+    let m = builder.build();
+    let result = m.request(diff_content)?;
+    Ok(result)
+}
+
+pub fn confirm_commit(commit_message: &str) -> bool {
+    println!("--------------------------------------");
+    println!("{}", commit_message.cyan().bold());
+    println!("--------------------------------------");
+    print!("Are you sure you want to commit? (Y/n) ");
+    let mut input = String::new();
+
+    // flush
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut input).expect("Failed to read line");
+
+    return input.trim() == "y" || input.trim() == "Y" || input.trim() == "";
 }

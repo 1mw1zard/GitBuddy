@@ -1,10 +1,11 @@
-mod git;
-mod llm;
+use std::time::Instant;
 
-use std::thread::sleep;
-use std::time::{Duration, Instant};
 use colored::Colorize;
+
 use crate::ai::git::{git_stage_diff, git_stage_filenames};
+use crate::llm;
+
+mod git;
 
 pub fn handler(dry_run: bool) {
     if !is_git_directory() {
@@ -28,7 +29,7 @@ pub fn handler(dry_run: bool) {
     println!("Generating commit message by LLM...");
 
     let start = Instant::now();
-    let llm_result = llm::openai_request(&diff_content).unwrap();
+    let llm_result = llm::llm_request(&diff_content).unwrap();
     let duration = start.elapsed();
 
     let usage_message = format!(
