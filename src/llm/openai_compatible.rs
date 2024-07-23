@@ -70,7 +70,7 @@ impl OpenAICompatible {
             .expect("Error sending request");
 
         return if response.status().is_success() {
-            let response_json = OpenAIResponse {
+            let _response_json = OpenAIResponse {
                 id: "".to_string(),
                 model: "".to_string(),
                 object: "".to_string(),

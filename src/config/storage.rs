@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 
 const DEFAULT_DIR: &str = ".config/gitbuddy";
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -55,11 +55,11 @@ pub(crate) fn read_config() -> Option<String> {
 
     let config_file_name = dir.join(CONFIG_FILE_NAME);
 
-    match fs::read_to_string(&config_file_name) {
+    match fs::read_to_string(config_file_name) {
         Ok(content) => {
             Some(content)
         },
-        Err(e) => {
+        Err(_) => {
             None
         }
     }
