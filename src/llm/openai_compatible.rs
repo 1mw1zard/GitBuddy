@@ -1,28 +1,57 @@
 use serde_json::json;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use crate::llm::LLMResult;
 
 #[derive(Debug)]
 pub(crate) struct OpenAICompatible {
     pub(crate) url: String,
     pub(crate) model: String,
     pub(crate) prompt: String,
-    pub(crate) api_key: Option<String>,
+    pub(crate) api_key: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct OpenAIResponse {
+    id: String,
+    model: String, // 生成该 completion 的模型名
+    object: String,
+    system_fingerprint: String, // This fingerprint represents the backend configuration that the model runs with.
+    choices: Vec<OpenAIResponseChoice>,
+    usage: OpenAIResponseUsage, // 该对话补全请求的用量信息
+    created: i64, // 创建聊天完成时的 Unix 时间戳（以秒为单位）
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OpenAIResponseChoice {
+    index: i64, // 该 completion 在模型生成的 completion 的选择列表中的索引。
+    message: OpenAIResponseChoiceMessage,
+    finish_reason: String, // 模型停止生成 token 的原因:stop/length/content_filter
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OpenAIResponseChoiceMessage {
+    role: String, // 角色:assistant
+    content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OpenAIResponseUsage {
+    completion_tokens: i64,
+    prompt_tokens: i64,
+    total_tokens: i64,
+}
+
+
 impl OpenAICompatible {
-    pub(crate) fn request(&self, diff_content: &str) -> Result<String> {
+    pub(crate) fn request(&self, diff_content: &str) -> Result<LLMResult> {
         let client = reqwest::blocking::Client::new();
 
-        let real_api_key: String;
-        if let Some(api_key) = self.api_key.clone() {
-            real_api_key = api_key;
-        } else {
-            return Err(anyhow::anyhow!("OpenAI API key is empty"));
-        }
+        let api_key = self.api_key.clone();
 
         let response = client
             .post(format!("{}/v1/chat/completions", self.url))
-            .header("Authorization", format!("Bearer {real_api_key}", ))
+            .header("Authorization", format!("Bearer {api_key}", ))
             .json(&json!({
             "model": &self.model,
             "messages": [
@@ -40,9 +69,40 @@ impl OpenAICompatible {
             .send()
             .expect("Error sending request");
 
-        // TODO
-        _ = response;
+        return if response.status().is_success() {
+            let response_json = OpenAIResponse {
+                id: "".to_string(),
+                model: "".to_string(),
+                object: "".to_string(),
+                system_fingerprint: "".to_string(),
+                choices: vec![],
+                usage: OpenAIResponseUsage {
+                    completion_tokens: 0,
+                    prompt_tokens: 0,
+                    total_tokens: 0,
+                },
+                created: 0,
+            };
+            let response_json: OpenAIResponse = response.json().expect("Failed to parse response as JSON");
 
-        Ok("todo".to_string())
+            if response_json.choices.is_empty() {
+                panic!("No choices returned from OpenAI API");
+            }
+            let choice = &response_json.choices[0];
+            Ok(LLMResult {
+                commit_message: choice.message.content.clone().trim().to_string(),
+                total_tokens: response_json.usage.total_tokens,
+                prompt_tokens: response_json.usage.prompt_tokens,
+                completion_tokens: response_json.usage.completion_tokens,
+            })
+        } else {
+            let reason = match response.text() {
+                Ok(text) => text,
+                Err(e) => {
+                    return Err(anyhow!("Error: {:?}", e.to_string().truncate(100)));
+                }
+            };
+            return Err(anyhow!("Error: {}", reason));
+        };
     }
 }

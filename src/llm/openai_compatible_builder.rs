@@ -37,7 +37,7 @@ impl OpenAICompatibleBuilder {
             url: self.url,
             model: self.model,
             prompt: PROMPT.parse().unwrap(),
-            api_key: None,
+            api_key: self.api_key,
         }
     }
 }

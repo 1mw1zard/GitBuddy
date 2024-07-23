@@ -1,14 +1,9 @@
-use std::any::Any;
-
-use anyhow::Result;
-use clap::Subcommand;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-
-use llm::{OpenAILikeParams, UseModel};
-
+pub use crate::config::vendor::{OpenAILikeParams, UseModel};
 use crate::llm::PromptModel;
 
-mod llm;
+mod vendor;
 mod storage;
 
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
@@ -41,9 +36,19 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn get_config() -> Result<GlobalConfig> {
+    let result = GlobalConfig::load();
+    match result {
+        Some(config) => Ok(config),
+        None => {
+            Err(anyhow!("Config not found."))
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-struct GlobalConfig {
-    model: Option<UseModel>,
+pub struct GlobalConfig {
+    pub model: Option<UseModel>,
 }
 
 impl GlobalConfig {
@@ -81,7 +86,7 @@ impl GlobalConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::config::llm::OpenAILikeParams;
+    use crate::config::vendor::OpenAILikeParams;
 
     use super::*;
 
@@ -123,16 +128,4 @@ api_key = "sk-12345678"
         // cfg.save();
     }
 
-    #[test]
-    fn load_config() {
-        let result = GlobalConfig::load();
-        match result {
-            Ok(cfg) => {
-                println!("{:?}", cfg);
-            }
-            Err(e) => {
-                println!("{:?}", e);
-            }
-        }
-    }
 }

@@ -7,7 +7,7 @@ pub enum UseModel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct OpenAILikeParams {
+pub struct OpenAILikeParams {
     pub model: String,
     pub api_key: String,
 }
