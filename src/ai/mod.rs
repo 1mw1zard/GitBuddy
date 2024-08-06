@@ -47,22 +47,9 @@ pub fn handler(dry_run: bool) {
 }
 
 fn is_git_directory() -> bool {
-    // 获取当前目录
-    let current_dir = std::env::current_dir().unwrap();
-
-    // 检查当前目录是否为git目录
-    return if current_dir.join(".git").exists() {
-        true
-    } else {
-        false
-    };
+    return std::process::Command::new("git").arg("rev-parse").output().is_ok();
 }
 
 fn is_git_installed() -> bool {
-    // 检查是否安装git
-    return if std::process::Command::new("git").arg("--version").output().is_ok() {
-        true
-    } else {
-        false
-    };
+    return std::process::Command::new("git").arg("--version").output().is_ok();
 }
