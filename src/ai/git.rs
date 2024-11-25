@@ -73,7 +73,6 @@ fn ignore_filenames() -> Vec<&'static str> {
 /// Commits the changes to the repository.
 pub fn git_commit(message: &str, dry_run: bool) -> anyhow::Result<()> {
     if dry_run {
-        println!("{}", "Commit success!!! (with dry-run)".green().bold());
         return Ok(());
     }
 
@@ -82,10 +81,8 @@ pub fn git_commit(message: &str, dry_run: bool) -> anyhow::Result<()> {
         .output()?;
 
     if output.status.success() {
-        println!("{}", "Commit success!!!".green().bold());
         Ok(())
     } else {
-        println!("commit failed");
         Err(anyhow::anyhow!("commit failed"))
     }
 }
@@ -93,7 +90,6 @@ pub fn git_commit(message: &str, dry_run: bool) -> anyhow::Result<()> {
 /// Pushes the changes to the remote repository.
 pub fn git_push(dry_run: bool) -> anyhow::Result<()> {
     if dry_run {
-        println!("{}", "Push success!!! (with dry-run)".green().bold());
         return Ok(());
     }
 
@@ -102,10 +98,8 @@ pub fn git_push(dry_run: bool) -> anyhow::Result<()> {
         .output()?;
 
     if output.status.success() {
-        println!("{}", "Push success!!!".green().bold());
         Ok(())
     } else {
-        println!("push failed");
         Err(anyhow::anyhow!("push failed"))
     }
 }

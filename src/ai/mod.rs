@@ -51,7 +51,7 @@ pub fn handler(push: bool, dry_run: bool) {
     let result = git::git_commit(llm_result.commit_message.trim(), dry_run);
     match result {
         Ok(_) => {
-            println!("{}", "Commit success!!!".green())
+            println!("{}", "Commit success!!!".green().bold());
         }
         Err(e) => {
             eprintln!("{}", e)
