@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 
 mod ai;
-mod llm;
 mod config;
+mod llm;
 
 #[derive(Parser)]
 #[command(
@@ -20,8 +20,11 @@ struct Cli {
 enum Commands {
     /// Generate a commit message based on the current state of the repository
     Ai {
+        /// push the commit to the remote repository
+        #[arg(short, long, default_value_t = false)]
+        push: bool,
         /// test argument, generate commit message but not commit
-        #[arg(short, long)]
+        #[arg(long, default_value_t = false)]
         dry_run: bool,
     },
     Config {
@@ -34,15 +37,18 @@ enum Commands {
     },
 }
 
-
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Ai { dry_run }) => {
-            ai::handler(*dry_run);
+        Some(Commands::Ai { push, dry_run }) => {
+            ai::handler(*push, *dry_run);
         }
-        Some(Commands::Config { vendor, api_key, model }) => {
+        Some(Commands::Config {
+            vendor,
+            api_key,
+            model,
+        }) => {
             let model = if let Some(model) = model {
                 model.to_string()
             } else {

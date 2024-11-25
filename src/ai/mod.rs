@@ -7,7 +7,7 @@ use crate::llm;
 
 mod git;
 
-pub fn handler(dry_run: bool) {
+pub fn handler(push: bool, dry_run: bool) {
     if !is_git_directory() {
         println!("Not git directory");
         return;
@@ -34,22 +34,53 @@ pub fn handler(dry_run: bool) {
 
     let usage_message = format!(
         "duration={:?} - Usage={}(completion={}, prompt={})]",
-        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
+        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens
+    );
 
-    println!("{}  {}", "Completed!".green(), usage_message.truecolor(128, 128, 128));
+    println!(
+        "{}  {}",
+        "Completed!".green(),
+        usage_message.truecolor(128, 128, 128)
+    );
 
     if !llm::confirm_commit(llm_result.commit_message.as_str()) {
         println!("{}", "Cancel commit".red());
         return;
     }
 
-    git::git_commit(llm_result.commit_message.trim(), dry_run);
+    let result = git::git_commit(llm_result.commit_message.trim(), dry_run);
+    match result {
+        Ok(_) => {
+            println!("{}", "Commit success!!!".green().bold());
+        }
+        Err(e) => {
+            eprintln!("{}", e)
+        }
+    }
+
+    // push
+    if push {
+        match git::git_push(dry_run) {
+            Ok(_) => {
+                println!("{}", "Push success!!!".green())
+            }
+            Err(e) => {
+                eprintln!("{}", e)
+            }
+        }
+    }
 }
 
 fn is_git_directory() -> bool {
-    return std::process::Command::new("git").arg("rev-parse").output().is_ok();
+    return std::process::Command::new("git")
+        .arg("rev-parse")
+        .output()
+        .is_ok();
 }
 
 fn is_git_installed() -> bool {
-    return std::process::Command::new("git").arg("--version").output().is_ok();
+    return std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .is_ok();
 }
