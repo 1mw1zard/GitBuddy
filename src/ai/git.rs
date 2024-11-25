@@ -1,4 +1,3 @@
-use colored::Colorize;
 use std::process::Command;
 
 pub fn git_stage_filenames() -> Vec<String> {
