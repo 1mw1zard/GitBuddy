@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum UseModel {
     DeepSeek(OpenAILikeParams),
     OpenAI(OpenAILikeParams),
+    Ollama(OpenAILikeParams),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

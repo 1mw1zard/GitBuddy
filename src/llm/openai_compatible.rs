@@ -1,7 +1,8 @@
-use serde_json::json;
+use crate::llm::LLMResult;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use crate::llm::LLMResult;
+use serde_json::json;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct OpenAICompatible {
@@ -19,7 +20,7 @@ struct OpenAIResponse {
     system_fingerprint: String, // This fingerprint represents the backend configuration that the model runs with.
     choices: Vec<OpenAIResponseChoice>,
     usage: OpenAIResponseUsage, // 该对话补全请求的用量信息
-    created: i64, // 创建聊天完成时的 Unix 时间戳（以秒为单位）
+    created: i64,               // 创建聊天完成时的 Unix 时间戳（以秒为单位）
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,7 +43,6 @@ struct OpenAIResponseUsage {
     total_tokens: i64,
 }
 
-
 impl OpenAICompatible {
     pub(crate) fn request(&self, diff_content: &str) -> Result<LLMResult> {
         let client = reqwest::blocking::Client::new();
@@ -51,21 +51,26 @@ impl OpenAICompatible {
 
         let response = client
             .post(format!("{}/v1/chat/completions", self.url))
-            .header("Authorization", format!("Bearer {api_key}", ))
+            .timeout(Duration::from_secs(120))
+            .header("Authorization", format!("Bearer {api_key}",))
             .json(&json!({
-            "model": &self.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": self.prompt,
+                "model": &self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": self.prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": diff_content
+                    }
+                ],
+                "options": {
+                    "temperature": 0,
                 },
-                {
-                    "role": "user",
-                    "content": diff_content
-                }
-            ],
-            "max_tokens": 100
-        }))
+                "keep_alive": "30m",
+                "max_tokens": 512,
+            }))
             .send()
             .expect("Error sending request");
 
@@ -83,7 +88,8 @@ impl OpenAICompatible {
                 },
                 created: 0,
             };
-            let response_json: OpenAIResponse = response.json().expect("Failed to parse response as JSON");
+            let response_json: OpenAIResponse =
+                response.json().expect("Failed to parse response as JSON");
 
             if response_json.choices.is_empty() {
                 panic!("No choices returned from OpenAI API");

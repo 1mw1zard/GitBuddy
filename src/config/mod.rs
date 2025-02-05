@@ -26,6 +26,9 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
         PromptModel::OpenAI => {
             UseModel::OpenAI(openai_like_params)
         }
+        PromptModel::Ollama => {
+            UseModel::OpenAI(openai_like_params)
+        }
     };
 
     config.set_model(model);
