@@ -26,6 +26,8 @@ enum Commands {
         /// test argument, generate commit message but not commit
         #[arg(long, default_value_t = false)]
         dry_run: bool,
+        #[arg(short, long, default_value_t=String::from("deepseek"))]
+        model: String,
     },
     Config {
         #[arg(value_enum)]
@@ -41,8 +43,8 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run);
+        Some(Commands::Ai { push, dry_run , model}) => {
+            ai::handler(*push, *dry_run, model.as_str());
         }
         Some(Commands::Config {
             vendor,

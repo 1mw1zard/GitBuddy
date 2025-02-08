@@ -1,9 +1,9 @@
 mod openai_compatible;
 mod openai_compatible_builder;
+mod prompt;
 
 use crate::config;
-use crate::config::UseModel;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
 use openai_compatible_builder::OpenAICompatibleBuilder;
@@ -22,11 +22,11 @@ pub enum PromptModel {
 
 impl PromptModel {
     pub fn default_model(&self) -> String {
-        return match self {
+        match self {
             PromptModel::OpenAI => "gpt-3.5-turbo".to_string(),
             PromptModel::DeepSeek => "deepseek-chat".to_string(),
             PromptModel::Ollama => "ollama".to_string(),
-        };
+        }
     }
 }
 
@@ -54,33 +54,23 @@ impl RequestsWrap {
     }
 }
 
-pub fn llm_request(diff_content: &str) -> Result<LLMResult> {
+pub fn llm_request(diff_content: &str, vendor: &str) -> Result<LLMResult> {
     let config = config::get_config()?;
 
-    let model = match config.model {
-        Some(model) => model,
-        None => {
-            return Err(anyhow!("No model selected"));
-        }
+    let vendor = if vendor.is_empty() {
+        config.default.default_service.as_str()
+    } else {
+        vendor
     };
 
-    let RequestsWrap {
-        vendor,
-        model,
-        api_key,
-    } = match model {
-        UseModel::DeepSeek(params) => {
-            RequestsWrap::new(PromptModel::DeepSeek, params.model, params.api_key)
-        }
-        UseModel::OpenAI(params) => {
-            RequestsWrap::new(PromptModel::OpenAI, params.model, params.api_key)
-        }
-        UseModel::Ollama(params) => {
-            RequestsWrap::new(PromptModel::Ollama, params.model, params.api_key)
-        }
-    };
+    let (model_config, prompt_model) = config.model(vendor).unwrap();
 
-    get_commit_message(vendor, model.as_str(), api_key.as_str(), diff_content)
+    get_commit_message(
+        prompt_model,
+        model_config.model.as_str(),
+        model_config.api_key.clone().unwrap_or("".into()).as_str(),
+        diff_content,
+    )
 }
 
 fn get_commit_message(

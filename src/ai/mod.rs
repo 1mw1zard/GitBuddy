@@ -7,7 +7,7 @@ use crate::llm;
 
 mod git;
 
-pub fn handler(push: bool, dry_run: bool) {
+pub fn handler(push: bool, dry_run: bool, vendor: &str) {
     if !is_git_directory() {
         println!("Not git directory");
         return;
@@ -29,7 +29,7 @@ pub fn handler(push: bool, dry_run: bool) {
     println!("Generating commit message by LLM...");
 
     let start = Instant::now();
-    let llm_result = llm::llm_request(&diff_content).unwrap();
+    let llm_result = llm::llm_request(&diff_content, vendor).unwrap();
     let duration = start.elapsed();
 
     let usage_message = format!(

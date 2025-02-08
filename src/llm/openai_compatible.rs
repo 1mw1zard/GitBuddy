@@ -66,10 +66,10 @@ impl OpenAICompatible {
                     }
                 ],
                 "options": {
-                    "temperature": 0,
+                    "temperature": 0.4,
                 },
                 "keep_alive": "30m",
-                "max_tokens": 512,
+                "max_tokens": 2048,
             }))
             .send()
             .expect("Error sending request");
