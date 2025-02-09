@@ -4,10 +4,11 @@ use colored::Colorize;
 
 use crate::ai::git::{git_stage_diff, git_stage_filenames};
 use crate::llm;
+use crate::llm::PromptModel;
 
 mod git;
 
-pub fn handler(push: bool, dry_run: bool, vendor: &str) {
+pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>) {
     if !is_git_directory() {
         println!("Not git directory");
         return;
@@ -32,16 +33,9 @@ pub fn handler(push: bool, dry_run: bool, vendor: &str) {
     let llm_result = llm::llm_request(&diff_content, vendor).unwrap();
     let duration = start.elapsed();
 
-    let usage_message = format!(
-        "duration={:?} - Usage={}(completion={}, prompt={})]",
-        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens
-    );
+    let usage_message = format!("duration={:?} - Usage={}(completion={}, prompt={})]", duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
 
-    println!(
-        "{}  {}",
-        "Completed!".green(),
-        usage_message.truecolor(128, 128, 128)
-    );
+    println!("{}  {}", "Completed!".green(), usage_message.truecolor(128, 128, 128));
 
     if !llm::confirm_commit(llm_result.commit_message.as_str()) {
         println!("{}", "Cancel commit".red());
@@ -72,15 +66,9 @@ pub fn handler(push: bool, dry_run: bool, vendor: &str) {
 }
 
 fn is_git_directory() -> bool {
-    return std::process::Command::new("git")
-        .arg("rev-parse")
-        .output()
-        .is_ok();
+    return std::process::Command::new("git").arg("rev-parse").output().is_ok();
 }
 
 fn is_git_installed() -> bool {
-    return std::process::Command::new("git")
-        .arg("--version")
-        .output()
-        .is_ok();
+    return std::process::Command::new("git").arg("--version").output().is_ok();
 }

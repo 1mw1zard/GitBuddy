@@ -7,16 +7,20 @@ use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
 use openai_compatible_builder::OpenAICompatibleBuilder;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 /// Prompt model
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, Serialize)]
 pub enum PromptModel {
     #[clap(name = "openai")]
+    #[serde(rename = "openai")]
     OpenAI,
     #[clap(name = "deepseek")]
+    #[serde(rename = "deepseek")]
     DeepSeek,
     #[clap(name = "ollama")]
+    #[serde(rename = "ollama")]
     Ollama,
 }
 
@@ -46,39 +50,19 @@ struct RequestsWrap {
 
 impl RequestsWrap {
     fn new(vendor: PromptModel, model: String, api_key: String) -> Self {
-        RequestsWrap {
-            vendor,
-            model,
-            api_key,
-        }
+        RequestsWrap { vendor, model, api_key }
     }
 }
 
-pub fn llm_request(diff_content: &str, vendor: &str) -> Result<LLMResult> {
+pub fn llm_request(diff_content: &str, vendor: Option<PromptModel>) -> Result<LLMResult> {
     let config = config::get_config()?;
-
-    let vendor = if vendor.is_empty() {
-        config.default.default_service.as_str()
-    } else {
-        vendor
-    };
 
     let (model_config, prompt_model) = config.model(vendor).unwrap();
 
-    get_commit_message(
-        prompt_model,
-        model_config.model.as_str(),
-        model_config.api_key.clone().unwrap_or("".into()).as_str(),
-        diff_content,
-    )
+    get_commit_message(prompt_model, model_config.model.as_str(), model_config.api_key.clone().unwrap_or("".into()).as_str(), diff_content)
 }
 
-fn get_commit_message(
-    vendor: PromptModel,
-    model: &str,
-    api_key: &str,
-    diff_content: &str,
-) -> Result<LLMResult> {
+fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<LLMResult> {
     let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
     // generate http request
@@ -96,9 +80,7 @@ pub fn confirm_commit(commit_message: &str) -> bool {
 
     // flush
     std::io::stdout().flush().unwrap();
-    std::io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
+    std::io::stdin().read_line(&mut input).expect("Failed to read line");
 
     return input.trim() == "y" || input.trim() == "Y" || input.trim() == "";
 }

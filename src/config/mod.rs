@@ -37,7 +37,7 @@ fn get_default_base_url(vendor: &PromptModel) -> String {
 fn create_default_config() -> GlobalConfig {
     GlobalConfig {
         default: DefaultConfig {
-            default_service: "openai".to_string(),
+            default_service: PromptModel::DeepSeek,
             timeout: 30,
         },
         openai: None,
@@ -90,18 +90,11 @@ impl GlobalConfig {
     }
 
     // load model
-    pub fn model(&self, vendor: &str) -> Option<(ModelConfig, PromptModel)> {
-        let vendor = if vendor.is_empty() {
-            self.default.default_service.as_str()
-        } else {
-            vendor
-        };
-
-        match vendor {
-            "openai" => Some((self.openai.clone()?, PromptModel::OpenAI)),
-            "deepseek" => Some((self.deepseek.clone()?, PromptModel::DeepSeek)),
-            "ollama" => Some((self.ollama.clone()?, PromptModel::Ollama)),
-            _ => None,
+    pub fn model(&self, vendor: Option<PromptModel>) -> Option<(&ModelConfig, PromptModel)> {
+        match vendor.unwrap_or(self.default.default_service) {
+            PromptModel::OpenAI => self.openai.as_ref().map(|cfg| (cfg, PromptModel::OpenAI)),
+            PromptModel::DeepSeek => self.deepseek.as_ref().map(|cfg| (cfg, PromptModel::DeepSeek)),
+            PromptModel::Ollama => self.ollama.as_ref().map(|cfg| (cfg, PromptModel::Ollama)),
         }
     }
 }
@@ -115,7 +108,7 @@ pub struct ModelConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DefaultConfig {
-    pub default_service: String,
+    pub default_service: PromptModel,
     pub timeout: u32,
 }
 
@@ -136,9 +129,7 @@ mod test {
     fn test_config() {
         let params = ModelConfig {
             model: String::from("gpt-3.5-turbo"),
-            api_key: Some(String::from(
-                "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            )),
+            api_key: Some(String::from("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")),
         };
 
         let mut cfg = GlobalConfig::new();
