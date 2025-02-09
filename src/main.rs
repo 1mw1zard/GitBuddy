@@ -13,6 +13,9 @@ struct Cli {
 
     #[arg(long)]
     vendor: Option<PromptModel>,
+
+    #[arg(short, long)]
+    model: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -47,13 +50,13 @@ fn main() {
             dry_run,
             // vendor,
         }) => {
-            ai::handler(*push, *dry_run, cli.vendor);
+            ai::handler(*push, *dry_run, cli.vendor, cli.model);
         }
         Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model { model.to_string() } else { vendor.default_model().to_string() };
 
             config::handler(vendor, api_key, model.as_str()).unwrap();
         }
-        None => ai::handler(false, false, cli.vendor),
+        None => ai::handler(false, false, cli.vendor, cli.model),
     }
 }

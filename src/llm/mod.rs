@@ -54,12 +54,15 @@ impl RequestsWrap {
     }
 }
 
-pub fn llm_request(diff_content: &str, vendor: Option<PromptModel>) -> Result<LLMResult> {
+pub fn llm_request(diff_content: &str, vendor: Option<PromptModel>, model: Option<String>) -> Result<LLMResult> {
     let config = config::get_config()?;
 
     let (model_config, prompt_model) = config.model(vendor).unwrap();
 
-    get_commit_message(prompt_model, model_config.model.as_str(), model_config.api_key.clone().unwrap_or("".into()).as_str(), diff_content)
+    let model = model.unwrap_or(model_config.model.clone());
+    println!("use model: {model}");
+
+    get_commit_message(prompt_model, model.as_str(), model_config.api_key.clone().unwrap_or("".into()).as_str(), diff_content)
 }
 
 fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<LLMResult> {

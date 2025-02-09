@@ -8,7 +8,7 @@ use crate::llm::PromptModel;
 
 mod git;
 
-pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>) {
+pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>, model: Option<String>) {
     if !is_git_directory() {
         println!("Not git directory");
         return;
@@ -31,7 +31,7 @@ pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>) {
     println!("Generating commit message by LLM...");
 
     let start = Instant::now();
-    let llm_result = llm::llm_request(&diff_content, vendor).unwrap();
+    let llm_result = llm::llm_request(&diff_content, vendor, model).unwrap();
     let duration = start.elapsed();
 
     let usage_message = format!("duration={:?} - Usage={}(completion={}, prompt={})]", duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
