@@ -66,12 +66,14 @@ impl OpenAICompatible {
                         "content": format!("diff content: \n{diff_content}"),
                     }
                 ],
-                // "options": {
-                //     "temperature": 0,
-                // },
+                "options": {
+                    "temperature": option.temperature,
+                    "top_p": option.top_p,
+                    "top_k": option.top_k,
+                },
                 "options": option,
                 "keep_alive": "30m",
-                // "max_tokens": 2048,
+                "max_tokens": option.max_tokens,
                 // "format": {
                 //     "type": "object",
                 //     "properties": {"subject": {"type":"string"}, "scope": {"type":"string"}, "summary": {"type":"string"}},

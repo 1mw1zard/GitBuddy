@@ -44,9 +44,10 @@ fn create_default_config() -> GlobalConfig {
         deepseek: None,
         ollama: None,
         model_parameters: Some(ModelParameters {
-            temperature: 0.7,
-            top_p: 0.9,
-            max_tokens: 2000,
+            temperature: 0.1,
+            top_p: 0.75,
+            top_k: 5,
+            max_tokens: 1024,
         }),
     }
 }
@@ -105,6 +106,7 @@ impl GlobalConfig {
                 max_tokens: 1024,
                 temperature: 0.0,
                 top_p: 0.75,
+                top_k: 10,
             },
         }
     }
@@ -127,6 +129,7 @@ pub struct DefaultConfig {
 pub struct ModelParameters {
     pub temperature: f64,
     pub top_p: f64,
+    pub top_k: u32,
     pub max_tokens: u32,
 }
 
