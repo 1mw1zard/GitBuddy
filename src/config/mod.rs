@@ -97,6 +97,17 @@ impl GlobalConfig {
             PromptModel::Ollama => self.ollama.as_ref().map(|cfg| (cfg, PromptModel::Ollama)),
         }
     }
+
+    pub fn model_params(&self) -> ModelParameters {
+        match &self.model_parameters {
+            Some(mp) => mp.clone(),
+            None => ModelParameters {
+                max_tokens: 1024,
+                temperature: 0.0,
+                top_p: 0.75,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -112,7 +123,7 @@ pub struct DefaultConfig {
     pub timeout: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelParameters {
     pub temperature: f64,
     pub top_p: f64,

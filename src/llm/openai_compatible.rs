@@ -1,3 +1,4 @@
+use crate::config::ModelParameters;
 use crate::llm::LLMResult;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -44,7 +45,7 @@ struct OpenAIResponseUsage {
 }
 
 impl OpenAICompatible {
-    pub(crate) fn request(&self, diff_content: &str) -> Result<LLMResult> {
+    pub(crate) fn request(&self, diff_content: &str, option: ModelParameters) -> Result<LLMResult> {
         let client = reqwest::blocking::Client::new();
 
         let api_key = self.api_key.clone();
@@ -65,9 +66,10 @@ impl OpenAICompatible {
                         "content": format!("diff content: \n{diff_content}"),
                     }
                 ],
-                "options": {
-                    "temperature": 0,
-                },
+                // "options": {
+                //     "temperature": 0,
+                // },
+                "options": option,
                 "keep_alive": "30m",
                 // "max_tokens": 2048,
                 // "format": {
