@@ -62,14 +62,19 @@ impl OpenAICompatible {
                     },
                     {
                         "role": "user",
-                        "content": diff_content
+                        "content": format!("diff content: \n{diff_content}"),
                     }
                 ],
                 "options": {
-                    "temperature": 0.4,
+                    "temperature": 0,
                 },
                 "keep_alive": "30m",
-                "max_tokens": 2048,
+                // "max_tokens": 2048,
+                // "format": {
+                //     "type": "object",
+                //     "properties": {"subject": {"type":"string"}, "scope": {"type":"string"}, "summary": {"type":"string"}},
+                //     "required": ["subject", "scope", "summary"]
+                // },
             }))
             .send()
             .expect("Error sending request");
@@ -88,8 +93,7 @@ impl OpenAICompatible {
                 },
                 created: 0,
             };
-            let response_json: OpenAIResponse =
-                response.json().expect("Failed to parse response as JSON");
+            let response_json: OpenAIResponse = response.json().expect("Failed to parse response as JSON");
 
             if response_json.choices.is_empty() {
                 panic!("No choices returned from OpenAI API");

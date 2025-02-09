@@ -25,7 +25,8 @@ pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>) {
         return;
     }
 
-    let diff_content = format!("Code changes: \n```\n{}\n```", git_stage_diff());
+    let diff_content = git_stage_diff();
+    // let diff_content = format!("Code changes: \n```\n{}\n```", git_stage_diff());
 
     println!("Generating commit message by LLM...");
 
