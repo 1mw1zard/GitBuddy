@@ -1,3 +1,12 @@
+pub const PROMPT: &str = r###"You are a professional Git assistant. Based on the provided code changes, generate a concise Git Commit Message following the format:
+<type>(<scope>): <subject>
+
+Requirements:
+1. Output ONLY the commit message, no explanations or additional content.
+2. The type must be one of: fix, feat, docs, style, refactor, test, chore.
+3. The subject must be no longer than 50 characters.
+4. Use English."###;
+
 pub const _PROMPT: &str = r###"Generate an appropriate conventional commit message based on the output of the git diff --cached command.
 There MUST be only one type and description line.
   Use this template:
@@ -13,7 +22,7 @@ Response must be only commit message, example:
     BREAKING CHANGE: `extends` key in config file is now used for extending other config files
 "###;
 
-pub const PROMPT: &str = r###"You will receive a git diff. Write a commit message as if you are a senior software engineering.
+pub const _PROMPT2: &str = r###"You will receive a git diff. Write a commit message as if you are a senior software engineering.
   Keep the commit messages brief, but informative. Use new lines to break apart long sentences.
   Type can be fix, feat, BREAKING CHANGE. Other types of commits are allowed, e.g. build:, chore:, ci:, docs:, style:, refactor:, perf:, test:, and others.
 
