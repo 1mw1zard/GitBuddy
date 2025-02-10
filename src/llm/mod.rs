@@ -1,9 +1,9 @@
 mod openai_compatible;
 mod openai_compatible_builder;
-mod prompt;
 
 use crate::config;
 use crate::config::ModelParameters;
+use crate::prompt::Prompt;
 use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
@@ -55,7 +55,12 @@ impl RequestsWrap {
     }
 }
 
-pub fn llm_request(diff_content: &str, vendor: Option<PromptModel>, model: Option<String>) -> Result<LLMResult> {
+pub fn llm_request(
+    diff_content: &str,
+    vendor: Option<PromptModel>,
+    model: Option<String>,
+    prompt: Prompt,
+) -> Result<LLMResult> {
     let config = config::get_config()?;
 
     let (model_config, prompt_model) = config.model(vendor).unwrap();
@@ -63,14 +68,28 @@ pub fn llm_request(diff_content: &str, vendor: Option<PromptModel>, model: Optio
     let model = model.unwrap_or(model_config.model.clone());
     println!("use model: {model}");
 
-    get_commit_message(prompt_model, model.as_str(), model_config.api_key.clone().unwrap_or("".into()).as_str(), diff_content, config.model_params())
+    get_commit_message(
+        prompt_model,
+        model.as_str(),
+        model_config.api_key.clone().unwrap_or("".into()).as_str(),
+        diff_content,
+        config.model_params(),
+        prompt,
+    )
 }
 
-fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str, option: ModelParameters) -> Result<LLMResult> {
+fn get_commit_message(
+    vendor: PromptModel,
+    model: &str,
+    api_key: &str,
+    diff_content: &str,
+    option: ModelParameters,
+    prompt: Prompt,
+) -> Result<LLMResult> {
     let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
     // generate http request
-    let m = builder.build();
+    let m = builder.build(prompt.value().to_string());
     let result = m.request(diff_content, option)?;
     Ok(result)
 }

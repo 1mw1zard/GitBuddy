@@ -1,5 +1,4 @@
 use crate::llm::openai_compatible::OpenAICompatible;
-use crate::llm::prompt::PROMPT;
 use crate::llm::PromptModel;
 
 pub(crate) struct OpenAICompatibleBuilder {
@@ -29,11 +28,11 @@ impl OpenAICompatibleBuilder {
         }
     }
 
-    pub fn build(self) -> OpenAICompatible {
+    pub fn build(self, prompt: String) -> OpenAICompatible {
         OpenAICompatible {
             url: self.url,
             model: self.model,
-            prompt: PROMPT.parse().unwrap(),
+            prompt: prompt,
             api_key: self.api_key,
         }
     }

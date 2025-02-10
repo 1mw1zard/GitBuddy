@@ -1,5 +1,6 @@
 use crate::config::ModelParameters;
 use crate::llm::LLMResult;
+use crate::prompt::Prompt;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

@@ -1,12 +1,19 @@
 use crate::llm::PromptModel;
 use clap::{Parser, Subcommand};
+use prompt::Prompt;
 
 mod ai;
 mod config;
 mod llm;
+mod prompt;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = "An AI-driven tool designed to simplify your Git commit process.")]
+#[command(
+    author,
+    version,
+    about,
+    long_about = "An AI-driven tool designed to simplify your Git commit process."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -16,6 +23,9 @@ struct Cli {
 
     #[arg(short, long)]
     model: Option<String>,
+
+    #[arg(short='p', long, default_value_t=Prompt::P1)]
+    prompt: Prompt,
 }
 
 #[derive(Subcommand)]
@@ -50,13 +60,17 @@ fn main() {
             dry_run,
             // vendor,
         }) => {
-            ai::handler(*push, *dry_run, cli.vendor, cli.model);
+            ai::handler(*push, *dry_run, cli.vendor, cli.model, cli.prompt);
         }
         Some(Commands::Config { vendor, api_key, model }) => {
-            let model = if let Some(model) = model { model.to_string() } else { vendor.default_model().to_string() };
+            let model = if let Some(model) = model {
+                model.to_string()
+            } else {
+                vendor.default_model().to_string()
+            };
 
             config::handler(vendor, api_key, model.as_str()).unwrap();
         }
-        None => ai::handler(false, false, cli.vendor, cli.model),
+        None => ai::handler(false, false, cli.vendor, cli.model, cli.prompt),
     }
 }

@@ -5,10 +5,11 @@ use colored::Colorize;
 use crate::ai::git::{git_stage_diff, git_stage_filenames};
 use crate::llm;
 use crate::llm::PromptModel;
+use crate::prompt::Prompt;
 
 mod git;
 
-pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>, model: Option<String>) {
+pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>, model: Option<String>, prompt: Prompt) {
     if !is_git_directory() {
         println!("Not git directory");
         return;
@@ -31,10 +32,13 @@ pub fn handler(push: bool, dry_run: bool, vendor: Option<PromptModel>, model: Op
     println!("Generating commit message by LLM...");
 
     let start = Instant::now();
-    let llm_result = llm::llm_request(&diff_content, vendor, model).unwrap();
+    let llm_result = llm::llm_request(&diff_content, vendor, model, prompt).unwrap();
     let duration = start.elapsed();
 
-    let usage_message = format!("duration={:?} - Usage={}(completion={}, prompt={})]", duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens);
+    let usage_message = format!(
+        "duration={:?} - Usage={}(completion={}, prompt={})]",
+        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens
+    );
 
     println!("{}  {}", "Completed!".green(), usage_message.truecolor(128, 128, 128));
 
