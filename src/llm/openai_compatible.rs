@@ -14,24 +14,24 @@ pub(crate) struct OpenAICompatible {
 #[derive(Debug, Serialize, Deserialize)]
 struct OpenAIResponse {
     id: String,
-    model: String, // 生成该 completion 的模型名
+    model: String, // the model used to generate this completion
     object: String,
     system_fingerprint: String, // This fingerprint represents the backend configuration that the model runs with.
     choices: Vec<OpenAIResponseChoice>,
-    usage: OpenAIResponseUsage, // 该对话补全请求的用量信息
-    created: i64, // 创建聊天完成时的 Unix 时间戳（以秒为单位）
+    usage: OpenAIResponseUsage, // the usage information of the request
+    created: i64, // the Unix timestamp when the request was created
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct OpenAIResponseChoice {
-    index: i64, // 该 completion 在模型生成的 completion 的选择列表中的索引。
+    index: i64, // the index of the choice in the choices list
     message: OpenAIResponseChoiceMessage,
-    finish_reason: String, // 模型停止生成 token 的原因:stop/length/content_filter
+    finish_reason: String, // the reason why the model stopped generating tokens
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct OpenAIResponseChoiceMessage {
-    role: String, // 角色:assistant
+    role: String, // the role of the message
     content: String,
 }
 
