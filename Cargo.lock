@@ -431,7 +431,7 @@ checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
 name = "gitbuddy"
-version = "0.1.8"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
