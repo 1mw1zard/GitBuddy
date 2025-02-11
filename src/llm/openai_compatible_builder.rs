@@ -7,15 +7,6 @@ pub(crate) struct OpenAICompatibleBuilder {
     api_key: String,
 }
 
-const PROMPT: &str = "Generate a concise commit message based on \
-            the following git difference content. The generated message is plain text,\
-             does not contain identifiers such as markdown \"`\", \
-             and the generated content does not exceed 100 tokens. \
-             Depending on the nature of the change, it starts with one of the following prefixes:\
-              'build' (build system), 'chore' (chores), 'ci' (continuous integration), \
-              'docs' (documentation), 'feat' (new feature), 'fix' (fix), 'perf' (performance),\
-               'refactor' (refactoring), 'style' (style), 'test' (test):";
-
 impl OpenAICompatibleBuilder {
     pub fn new(vendor: PromptModel, model: &str, api_key: &str) -> Self {
         match vendor {
@@ -28,15 +19,20 @@ impl OpenAICompatibleBuilder {
                 url: String::from("https://api.deepseek.com"),
                 model: model.to_string(),
                 api_key: api_key.to_string(),
-            }
+            },
+            PromptModel::Ollama => OpenAICompatibleBuilder {
+                url: String::from("http://localhost:11434"),
+                model: model.to_string(),
+                api_key: api_key.to_string(),
+            },
         }
     }
 
-    pub fn build(self) -> OpenAICompatible {
+    pub fn build(self, prompt: String) -> OpenAICompatible {
         OpenAICompatible {
             url: self.url,
             model: self.model,
-            prompt: PROMPT.parse().unwrap(),
+            prompt: prompt,
             api_key: self.api_key,
         }
     }

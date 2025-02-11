@@ -1,7 +1,10 @@
-use serde_json::json;
+use crate::config::ModelParameters;
+use crate::llm::LLMResult;
+use crate::prompt::Prompt;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use crate::llm::LLMResult;
+use serde_json::json;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct OpenAICompatible {
@@ -42,30 +45,42 @@ struct OpenAIResponseUsage {
     total_tokens: i64,
 }
 
-
 impl OpenAICompatible {
-    pub(crate) fn request(&self, diff_content: &str) -> Result<LLMResult> {
+    pub(crate) fn request(&self, diff_content: &str, option: ModelParameters) -> Result<LLMResult> {
         let client = reqwest::blocking::Client::new();
 
         let api_key = self.api_key.clone();
 
         let response = client
             .post(format!("{}/v1/chat/completions", self.url))
-            .header("Authorization", format!("Bearer {api_key}", ))
+            .timeout(Duration::from_secs(120))
+            .header("Authorization", format!("Bearer {api_key}",))
             .json(&json!({
-            "model": &self.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": self.prompt,
+                "model": &self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": self.prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": format!("diff content: \n{diff_content}"),
+                    }
+                ],
+                "options": {
+                    "temperature": option.temperature,
+                    "top_p": option.top_p,
+                    "top_k": option.top_k,
                 },
-                {
-                    "role": "user",
-                    "content": diff_content
-                }
-            ],
-            "max_tokens": 100
-        }))
+                "options": option,
+                "keep_alive": "30m",
+                "max_tokens": option.max_tokens,
+                // "format": {
+                //     "type": "object",
+                //     "properties": {"subject": {"type":"string"}, "scope": {"type":"string"}, "summary": {"type":"string"}},
+                //     "required": ["subject", "scope", "summary"]
+                // },
+            }))
             .send()
             .expect("Error sending request");
 

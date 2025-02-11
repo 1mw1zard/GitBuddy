@@ -1,8 +1,11 @@
+use crate::llm::PromptModel;
 use clap::{Parser, Subcommand};
+use prompt::Prompt;
 
 mod ai;
 mod config;
 mod llm;
+mod prompt;
 
 #[derive(Parser)]
 #[command(
@@ -14,6 +17,15 @@ mod llm;
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    #[arg(long)]
+    vendor: Option<PromptModel>,
+
+    #[arg(short, long)]
+    model: Option<String>,
+
+    #[arg(short='p', long, default_value_t=Prompt::P1)]
+    prompt: Prompt,
 }
 
 #[derive(Subcommand)]
@@ -26,6 +38,8 @@ enum Commands {
         /// test argument, generate commit message but not commit
         #[arg(long, default_value_t = false)]
         dry_run: bool,
+        // #[arg(long, default_value_t=String::from("deepseek"))]
+        // vendor: String,
     },
     Config {
         #[arg(value_enum)]
@@ -41,14 +55,14 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run);
-        }
-        Some(Commands::Config {
-            vendor,
-            api_key,
-            model,
+        Some(Commands::Ai {
+            push,
+            dry_run,
+            // vendor,
         }) => {
+            ai::handler(*push, *dry_run, cli.vendor, cli.model, cli.prompt);
+        }
+        Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model {
                 model.to_string()
             } else {
@@ -57,8 +71,6 @@ fn main() {
 
             config::handler(vendor, api_key, model.as_str()).unwrap();
         }
-        None => {
-            println!("No subcommand provided.");
-        }
+        None => ai::handler(false, false, cli.vendor, cli.model, cli.prompt),
     }
 }
