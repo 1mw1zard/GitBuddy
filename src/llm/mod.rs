@@ -1,36 +1,39 @@
 mod openai_compatible;
 mod openai_compatible_builder;
 
-use std::io::Write;
-use anyhow::{anyhow, Result};
+use crate::config;
+use crate::config::ModelParameters;
+use crate::prompt::Prompt;
+use anyhow::Result;
 use clap::ValueEnum;
 use colored::Colorize;
 use openai_compatible_builder::OpenAICompatibleBuilder;
-use crate::config;
-use crate::config::UseModel;
+use serde::{Deserialize, Serialize};
+use std::io::Write;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 /// Prompt model
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, Serialize)]
 pub enum PromptModel {
     #[clap(name = "openai")]
+    #[serde(rename = "openai")]
     OpenAI,
     #[clap(name = "deepseek")]
+    #[serde(rename = "deepseek")]
     DeepSeek,
+    #[clap(name = "ollama")]
+    #[serde(rename = "ollama")]
+    Ollama,
 }
 
 impl PromptModel {
     pub fn default_model(&self) -> String {
-        return match self {
-            PromptModel::OpenAI => {
-                "gpt-3.5-turbo".to_string()
-            }
-            PromptModel::DeepSeek => {
-                "deepseek-chat".to_string()
-            }
-        };
+        match self {
+            PromptModel::OpenAI => "gpt-3.5-turbo".to_string(),
+            PromptModel::DeepSeek => "deepseek-chat".to_string(),
+            PromptModel::Ollama => "ollama".to_string(),
+        }
     }
 }
-
 
 #[derive(Debug)]
 pub struct LLMResult {
@@ -40,7 +43,6 @@ pub struct LLMResult {
     pub total_tokens: i64,
 }
 
-
 struct RequestsWrap {
     vendor: PromptModel,
     model: String,
@@ -49,44 +51,46 @@ struct RequestsWrap {
 
 impl RequestsWrap {
     fn new(vendor: PromptModel, model: String, api_key: String) -> Self {
-        RequestsWrap {
-            vendor,
-            model,
-            api_key,
-        }
+        RequestsWrap { vendor, model, api_key }
     }
 }
 
-
-pub fn llm_request(diff_content: &str) -> Result<LLMResult> {
+pub fn llm_request(
+    diff_content: &str,
+    vendor: Option<PromptModel>,
+    model: Option<String>,
+    prompt: Prompt,
+) -> Result<LLMResult> {
     let config = config::get_config()?;
 
-    let model = match config.model {
-        Some(model) => model,
-        None => {
-            return Err(anyhow!("No model selected"));
-        }
-    };
+    let (model_config, prompt_model) = config.model(vendor).unwrap();
 
-    let RequestsWrap { vendor, model, api_key } =
-        match model {
-            UseModel::DeepSeek(params) => {
-                RequestsWrap::new(PromptModel::DeepSeek, params.model, params.api_key)
-            }
-            UseModel::OpenAI(params) => {
-                RequestsWrap::new(PromptModel::OpenAI, params.model, params.api_key)
-            }
-        };
+    let model = model.unwrap_or(model_config.model.clone());
+    println!("use model: {model}");
 
-    get_commit_message(vendor, model.as_str(), api_key.as_str(), diff_content)
+    get_commit_message(
+        prompt_model,
+        model.as_str(),
+        model_config.api_key.clone().unwrap_or("".into()).as_str(),
+        diff_content,
+        config.model_params(),
+        prompt,
+    )
 }
 
-fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<LLMResult> {
+fn get_commit_message(
+    vendor: PromptModel,
+    model: &str,
+    api_key: &str,
+    diff_content: &str,
+    option: ModelParameters,
+    prompt: Prompt,
+) -> Result<LLMResult> {
     let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
     // generate http request
-    let m = builder.build();
-    let result = m.request(diff_content)?;
+    let m = builder.build(prompt.value().to_string());
+    let result = m.request(diff_content, option)?;
     Ok(result)
 }
 
