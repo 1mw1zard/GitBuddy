@@ -26,6 +26,11 @@ To get started with GitBuddy, follow these simple steps:
 cargo install gitbuddy
 ```
 
+To update if you already have installed, run:
+```sh
+cargo install --force gitbuddy
+```
+
 ### Configuration
 
 To use GitBuddy, simply run the following command in your terminal:
@@ -53,6 +58,7 @@ gitbuddy ai
 | Vendor      | Model(s)                        | Support |
 |-------------|---------------------------------|:-------:|
 | DeepSeek    | deepseek-chat                   |   yes   |
+| Ollama      | ollama                          |   yes   |
 | OpenAI      | gpt-3.5-turbo                   |   no    |
 | ByteDance   | Doubao-lite-4k<br>Doubao-pro-4k |   no    |
 | Baidu       | ERNIE 4.0                       |   no    |
