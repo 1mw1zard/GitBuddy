@@ -2,10 +2,10 @@
 name = "gitbuddy"
 version = "0.1.7"
 edition = "2021"
-authors = ["Jianbang <fujianbang0ops@gmail.com>"]
+authors = ["W1zard <fujianbang0ops@gmail.com>"]
 description = "An AI-driven tool designed to simplify your Git commit process."
 license = "Apache-2.0"
-repository = "https://github.com/fujianbang/gitbuddy"
+repository = "https://github.com/1mw1zard/gitbuddy"
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
