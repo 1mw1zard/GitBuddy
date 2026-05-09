@@ -8,10 +8,8 @@ mod storage;
 
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
     let mut config: GlobalConfig = match GlobalConfig::load() {
-        None => {
-            GlobalConfig::new()
-        }
-        Some(cfg) => { cfg }
+        None => GlobalConfig::new(),
+        Some(cfg) => cfg,
     };
 
     let openai_like_params = OpenAILikeParams {
@@ -19,17 +17,13 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
         api_key: api_key.to_string(),
     };
 
-    let model: UseModel = match vendor {
-        PromptModel::DeepSeek => {
-            UseModel::DeepSeek(openai_like_params)
-        }
-        PromptModel::OpenAI => {
-            UseModel::OpenAI(openai_like_params)
-        }
+    let model = match vendor {
+        PromptModel::DeepSeek => UseModel::DeepSeek(openai_like_params),
+        PromptModel::OpenAI => UseModel::OpenAI(openai_like_params),
     };
 
     config.set_model(model);
-    config.save().expect("Failed to save config.");
+    config.save()?;
 
     println!("Config saved.");
 
@@ -37,12 +31,9 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
 }
 
 pub fn get_config() -> Result<GlobalConfig> {
-    let result = GlobalConfig::load();
-    match result {
+    match GlobalConfig::load() {
         Some(config) => Ok(config),
-        None => {
-            Err(anyhow!("Config not found."))
-        }
+        None => Err(anyhow!("Config not found. Run `gitbuddy config` first.")),
     }
 }
 
@@ -66,7 +57,7 @@ impl GlobalConfig {
     /// save config to file
     pub fn save(&self) -> Result<()> {
         let content = toml::to_string(self)?;
-        let _ = storage::save_config(&content)?;
+        storage::save_config(&content)?;
         Ok(())
     }
 
@@ -83,11 +74,9 @@ impl GlobalConfig {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::config::vendor::OpenAILikeParams;
-
     use super::*;
 
     #[test]
@@ -113,6 +102,7 @@ api_key = "sk-12345678"
         "#;
 
         let cfg: GlobalConfig = toml::from_str(toml_str).unwrap();
+        assert!(matches!(cfg.model, Some(UseModel::DeepSeek(_))));
     }
 
     #[test]
@@ -127,5 +117,4 @@ api_key = "sk-12345678"
         cfg.set_model(UseModel::DeepSeek(params));
         // cfg.save();
     }
-
 }

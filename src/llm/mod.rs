@@ -4,7 +4,6 @@ mod openai_compatible_builder;
 use std::io::Write;
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
-use colored::Colorize;
 use openai_compatible_builder::OpenAICompatibleBuilder;
 use crate::config;
 use crate::config::UseModel;
@@ -20,17 +19,12 @@ pub enum PromptModel {
 
 impl PromptModel {
     pub fn default_model(&self) -> String {
-        return match self {
-            PromptModel::OpenAI => {
-                "gpt-3.5-turbo".to_string()
-            }
-            PromptModel::DeepSeek => {
-                "deepseek-chat".to_string()
-            }
-        };
+        match self {
+            PromptModel::OpenAI => "gpt-3.5-turbo".to_string(),
+            PromptModel::DeepSeek => "deepseek v4 flash".to_string(),
+        }
     }
 }
-
 
 #[derive(Debug)]
 pub struct LLMResult {
@@ -39,7 +33,6 @@ pub struct LLMResult {
     pub prompt_tokens: i64,
     pub total_tokens: i64,
 }
-
 
 struct RequestsWrap {
     vendor: PromptModel,
@@ -57,14 +50,13 @@ impl RequestsWrap {
     }
 }
 
-
 pub fn llm_request(diff_content: &str) -> Result<LLMResult> {
     let config = config::get_config()?;
 
     let model = match config.model {
         Some(model) => model,
         None => {
-            return Err(anyhow!("No model selected"));
+            return Err(anyhow!("No model selected. Run `gitbuddy config` first."));
         }
     };
 
@@ -84,22 +76,17 @@ pub fn llm_request(diff_content: &str) -> Result<LLMResult> {
 fn get_commit_message(vendor: PromptModel, model: &str, api_key: &str, diff_content: &str) -> Result<LLMResult> {
     let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
 
-    // generate http request
     let m = builder.build();
     let result = m.request(diff_content)?;
     Ok(result)
 }
 
-pub fn confirm_commit(commit_message: &str) -> bool {
-    println!("--------------------------------------");
-    println!("{}", commit_message.cyan().bold());
-    println!("--------------------------------------");
+pub fn confirm_commit() -> Result<bool> {
     print!("Are you sure you want to commit? (Y/n) ");
     let mut input = String::new();
 
-    // flush
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut input).expect("Failed to read line");
+    std::io::stdout().flush()?;
+    std::io::stdin().read_line(&mut input)?;
 
-    return input.trim() == "y" || input.trim() == "Y" || input.trim() == "";
+    Ok(input.trim() == "y" || input.trim() == "Y" || input.trim() == "")
 }

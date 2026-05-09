@@ -7,14 +7,14 @@ pub(crate) struct OpenAICompatibleBuilder {
     api_key: String,
 }
 
-const PROMPT: &str = "Generate a concise commit message based on \
-            the following git difference content. The generated message is plain text,\
-             does not contain identifiers such as markdown \"`\", \
-             and the generated content does not exceed 100 tokens. \
-             Depending on the nature of the change, it starts with one of the following prefixes:\
-              'build' (build system), 'chore' (chores), 'ci' (continuous integration), \
-              'docs' (documentation), 'feat' (new feature), 'fix' (fix), 'perf' (performance),\
-               'refactor' (refactoring), 'style' (style), 'test' (test):";
+const PROMPT: &str = r#"Generate a concise commit message based on
+            the following git difference content. The generated message is plain text,
+             does not contain identifiers such as markdown "`",
+             and the generated content does not exceed 100 tokens.
+             Depending on the nature of the change, it starts with one of the following prefixes:
+              'build' (build system), 'chore' (chores), 'ci' (continuous integration),
+              'docs' (documentation), 'feat' (new feature), 'fix' (fix), 'perf' (performance),
+               'refactor' (refactoring), 'style' (style), 'test' (test):"#;
 
 impl OpenAICompatibleBuilder {
     pub fn new(vendor: PromptModel, model: &str, api_key: &str) -> Self {
@@ -36,7 +36,7 @@ impl OpenAICompatibleBuilder {
         OpenAICompatible {
             url: self.url,
             model: self.model,
-            prompt: PROMPT.parse().unwrap(),
+            prompt: PROMPT.to_string(),
             api_key: self.api_key,
         }
     }

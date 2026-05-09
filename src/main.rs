@@ -1,4 +1,6 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 
 mod ai;
 mod config;
@@ -38,11 +40,18 @@ enum Commands {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("{} {}", "Error:".red().bold(), e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
         Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run);
+            ai::handler(*push, *dry_run, false, false)?;
         }
         Some(Commands::Config {
             vendor,
@@ -55,10 +64,12 @@ fn main() {
                 vendor.default_model().to_string()
             };
 
-            config::handler(vendor, api_key, model.as_str()).unwrap();
+            config::handler(vendor, api_key, model.as_str())?;
         }
         None => {
-            println!("No subcommand provided.");
+            ai::handler(false, false, true, true)?;
         }
     }
+
+    Ok(())
 }
