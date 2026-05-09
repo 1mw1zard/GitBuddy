@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct ModelConfig {
     pub api_key: Option<String>,
     pub model: String,
-    pub base_url: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]

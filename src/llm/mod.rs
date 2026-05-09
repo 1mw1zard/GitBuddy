@@ -62,7 +62,7 @@ pub fn llm_request(
         prompt_model,
         model.as_str(),
         model_config.api_key.clone().unwrap_or_default().as_str(),
-        model_config.base_url.as_str(),
+        model_config.base_url.as_deref().unwrap_or(""),
         diff_content,
         config.model_params(),
         prompt,
