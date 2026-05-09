@@ -1,120 +1,137 @@
-use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
-pub use crate::config::vendor::{OpenAILikeParams, UseModel};
 use crate::llm::PromptModel;
+use anyhow::{anyhow, Result};
 
-mod vendor;
+pub use vendor::{DefaultConfig, ModelConfig, ModelParameters};
+
 mod storage;
+mod vendor;
 
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
-    let mut config: GlobalConfig = match GlobalConfig::load() {
-        None => GlobalConfig::new(),
-        Some(cfg) => cfg,
-    };
+    let mut config = GlobalConfig::load().unwrap_or_else(GlobalConfig::new);
 
-    let openai_like_params = OpenAILikeParams {
+    let model_config = ModelConfig {
+        api_key: if api_key.is_empty() {
+            None
+        } else {
+            Some(api_key.to_string())
+        },
         model: model.to_string(),
-        api_key: api_key.to_string(),
+        base_url: default_base_url(vendor).to_string(),
     };
 
-    let model = match vendor {
-        PromptModel::DeepSeek => UseModel::DeepSeek(openai_like_params),
-        PromptModel::OpenAI => UseModel::OpenAI(openai_like_params),
-    };
+    match vendor {
+        PromptModel::DeepSeek => config.deepseek = Some(model_config),
+        PromptModel::OpenAI => config.openai = Some(model_config),
+        PromptModel::Ollama => config.ollama = Some(model_config),
+    }
 
-    config.set_model(model);
     config.save()?;
-
     println!("Config saved.");
-
     Ok(())
 }
 
-pub fn get_config() -> Result<GlobalConfig> {
-    match GlobalConfig::load() {
-        Some(config) => Ok(config),
-        None => Err(anyhow!("Config not found. Run `gitbuddy config` first.")),
+fn default_base_url(vendor: &PromptModel) -> &'static str {
+    match vendor {
+        PromptModel::OpenAI => "https://api.openai.com",
+        PromptModel::DeepSeek => "https://api.deepseek.com",
+        PromptModel::Ollama => "http://localhost:11434",
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+pub fn get_config() -> Result<GlobalConfig> {
+    GlobalConfig::load().ok_or_else(|| anyhow!("Config not found. Run `gitbuddy config` first."))
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GlobalConfig {
-    pub model: Option<UseModel>,
+    pub default: DefaultConfig,
+    pub openai: Option<ModelConfig>,
+    pub deepseek: Option<ModelConfig>,
+    pub ollama: Option<ModelConfig>,
+    pub model_parameters: Option<ModelParameters>,
 }
 
 impl GlobalConfig {
     pub fn new() -> Self {
-        GlobalConfig {
-            model: None,
+        Self {
+            default: DefaultConfig {
+                default_service: PromptModel::DeepSeek,
+                timeout: 30,
+            },
+            openai: None,
+            deepseek: None,
+            ollama: None,
+            model_parameters: Some(ModelParameters::default()),
         }
     }
 
-    /// Set use model
-    pub fn set_model(&mut self, model: UseModel) {
-        self.model = Some(model);
-    }
-
-    /// save config to file
     pub fn save(&self) -> Result<()> {
         let content = toml::to_string(self)?;
         storage::save_config(&content)?;
         Ok(())
     }
 
-    /// load config from file
     pub fn load() -> Option<Self> {
         let content = storage::read_config().unwrap_or_default();
         match toml::from_str(content.as_str()) {
             Ok(config) => Some(config),
             Err(err) => {
-                eprintln!("load config error: {}", err);
+                eprintln!("Load config error: {}", err);
                 None
             }
         }
+    }
+
+    pub fn model(&self, vendor: Option<PromptModel>) -> Option<(&ModelConfig, PromptModel)> {
+        match vendor.unwrap_or(self.default.default_service) {
+            PromptModel::OpenAI => self.openai.as_ref().map(|cfg| (cfg, PromptModel::OpenAI)),
+            PromptModel::DeepSeek => self.deepseek.as_ref().map(|cfg| (cfg, PromptModel::DeepSeek)),
+            PromptModel::Ollama => self.ollama.as_ref().map(|cfg| (cfg, PromptModel::Ollama)),
+        }
+    }
+
+    pub fn model_params(&self) -> ModelParameters {
+        self.model_parameters.unwrap_or_default()
+    }
+}
+
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::config::vendor::OpenAILikeParams;
     use super::*;
 
     #[test]
-    fn test_config() {
-        let params = OpenAILikeParams {
-            model: String::from("gpt-3.5-turbo"),
-            api_key: String::from("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
-        };
-
-        let mut cfg = GlobalConfig::new();
-        cfg.set_model(UseModel::DeepSeek(params));
-
+    fn new_config_serializes() {
+        let cfg = GlobalConfig::new();
         let toml_str = toml::to_string(&cfg).unwrap();
-        println!("{}", toml_str);
+
+        assert!(toml_str.contains("[default]"));
+        assert!(toml_str.contains("default_service = \"deepseek\""));
     }
 
     #[test]
-    fn config_serialization() {
+    fn config_deserializes_vendor_sections() {
         let toml_str = r#"
-[model.DeepSeek]
-model = "gpt-3.5-turbo"
+[default]
+default_service = "deepseek"
+timeout = 30
+
+[deepseek]
+model = "deepseek-chat"
 api_key = "sk-12345678"
+base_url = "https://api.deepseek.com"
         "#;
 
         let cfg: GlobalConfig = toml::from_str(toml_str).unwrap();
-        assert!(matches!(cfg.model, Some(UseModel::DeepSeek(_))));
-    }
+        let (model_config, vendor) = cfg.model(None).unwrap();
 
-    #[test]
-    fn save_config() {
-        let mut cfg = GlobalConfig::new();
-
-        let params = OpenAILikeParams {
-            model: String::from("gpt-3.5-turbo"),
-            api_key: String::from("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
-        };
-
-        cfg.set_model(UseModel::DeepSeek(params));
-        // cfg.save();
+        assert_eq!(vendor, PromptModel::DeepSeek);
+        assert_eq!(model_config.model, "deepseek-chat");
+        assert_eq!(model_config.api_key.as_deref(), Some("sk-12345678"));
     }
 }

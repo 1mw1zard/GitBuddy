@@ -16,8 +16,7 @@ fn get_config_dir() -> Option<PathBuf> {
 
 /// save config file to local config dir
 pub(crate) fn save_config(content: &str) -> Result<()> {
-    let path_buf = get_config_dir()
-        .ok_or_else(|| anyhow!("Failed to get home directory"))?;
+    let path_buf = get_config_dir().ok_or_else(|| anyhow!("Failed to get home directory"))?;
     save_config_to(content, &path_buf)
 }
 
@@ -27,7 +26,7 @@ pub(crate) fn read_config() -> Option<String> {
     read_config_from(&dir)
 }
 
-/// 核心保存逻辑，接受自定义目录（用于测试）
+/// Save config content to a custom directory.
 pub(crate) fn save_config_to(content: &str, dir: &Path) -> Result<()> {
     let mut path_buf = dir.to_path_buf();
 
@@ -37,8 +36,7 @@ pub(crate) fn save_config_to(content: &str, dir: &Path) -> Result<()> {
     }
 
     if !path_buf.exists() {
-        std::fs::create_dir_all(&path_buf)
-            .map_err(|e| anyhow!("Failed to create config directory: {}", e))?;
+        std::fs::create_dir_all(&path_buf).map_err(|e| anyhow!("Failed to create config directory: {}", e))?;
     }
 
     let config_file_name = path_buf.join(CONFIG_FILE_NAME);
@@ -46,7 +44,7 @@ pub(crate) fn save_config_to(content: &str, dir: &Path) -> Result<()> {
         .map_err(|e| anyhow!("Failed to write config file '{}': {}", config_file_name.display(), e))
 }
 
-/// 核心读取逻辑，接受自定义目录（用于测试）
+/// Read config content from a custom directory.
 pub(crate) fn read_config_from(dir: &Path) -> Option<String> {
     let config_file_name = dir.join(CONFIG_FILE_NAME);
     fs::read_to_string(config_file_name).ok()
@@ -88,9 +86,7 @@ api_key = "sk-12345678"
 
     fn uuid() -> String {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let dur = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap();
+        let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         format!("{}", dur.as_millis())
     }
 }

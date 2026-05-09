@@ -5,6 +5,10 @@ use colored::Colorize;
 mod ai;
 mod config;
 mod llm;
+mod prompt;
+
+use crate::llm::PromptModel;
+use prompt::Prompt;
 
 #[derive(Parser)]
 #[command(
@@ -16,6 +20,15 @@ mod llm;
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    #[arg(long)]
+    vendor: Option<PromptModel>,
+
+    #[arg(short, long)]
+    model: Option<String>,
+
+    #[arg(short='p', long, default_value_t=Prompt::P1)]
+    prompt: Prompt,
 }
 
 #[derive(Subcommand)]
@@ -51,13 +64,9 @@ fn run() -> Result<()> {
 
     match &cli.command {
         Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run, false, false)?;
+            ai::handler(*push, *dry_run, false, false, cli.vendor, cli.model.clone(), cli.prompt)?;
         }
-        Some(Commands::Config {
-            vendor,
-            api_key,
-            model,
-        }) => {
+        Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model {
                 model.to_string()
             } else {
@@ -67,7 +76,7 @@ fn run() -> Result<()> {
             config::handler(vendor, api_key, model.as_str())?;
         }
         None => {
-            ai::handler(false, false, true, true)?;
+            ai::handler(false, false, true, true, cli.vendor, cli.model.clone(), cli.prompt)?;
         }
     }
 

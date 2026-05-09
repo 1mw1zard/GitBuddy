@@ -17,8 +17,7 @@ pub fn git_stage_filenames() -> Result<Vec<String>> {
         return Ok(vec![]);
     }
 
-    let stdout = String::from_utf8(output.stdout)
-        .map_err(|e| anyhow!("Invalid UTF-8 in git output: {}", e))?;
+    let stdout = String::from_utf8(output.stdout).map_err(|e| anyhow!("Invalid UTF-8 in git output: {}", e))?;
 
     Ok(stdout
         .split('\n')
@@ -34,12 +33,7 @@ pub fn git_stage_diff() -> Result<String> {
         .collect();
 
     let mut command = Command::new("git");
-    command.args([
-        "diff",
-        "--cached",
-        "--no-ext-diff",
-        "--diff-algorithm=minimal",
-    ]);
+    command.args(["diff", "--cached", "--no-ext-diff", "--diff-algorithm=minimal"]);
 
     for path in exclude_path {
         command.arg(path);
@@ -51,22 +45,18 @@ pub fn git_stage_diff() -> Result<String> {
         return Ok(String::new());
     }
 
-    String::from_utf8(output.stdout)
-        .map_err(|e| anyhow!("Invalid UTF-8 in git diff output: {}", e))
+    String::from_utf8(output.stdout).map_err(|e| anyhow!("Invalid UTF-8 in git diff output: {}", e))
 }
 
-/// 获取 staged 变更的统计信息（文件名 + 增删行数）
+/// Return statistics for staged changes.
 pub fn git_stage_stats() -> Result<String> {
-    let output = Command::new("git")
-        .args(["diff", "--cached", "--stat"])
-        .output()?;
+    let output = Command::new("git").args(["diff", "--cached", "--stat"]).output()?;
 
     if !output.status.success() {
         return Ok(String::new());
     }
 
-    String::from_utf8(output.stdout)
-        .map_err(|e| anyhow!("Invalid UTF-8 in git stat output: {}", e))
+    String::from_utf8(output.stdout).map_err(|e| anyhow!("Invalid UTF-8 in git stat output: {}", e))
 }
 
 fn ignore_filenames() -> Vec<&'static str> {
@@ -87,9 +77,7 @@ pub fn git_commit(message: &str, dry_run: bool) -> Result<()> {
         return Ok(());
     }
 
-    let output = Command::new("git")
-        .args(["commit", "-m", message])
-        .output()?;
+    let output = Command::new("git").args(["commit", "-m", message]).output()?;
 
     if output.status.success() {
         Ok(())
@@ -105,9 +93,7 @@ pub fn git_push(dry_run: bool) -> Result<()> {
         return Ok(());
     }
 
-    let output = Command::new("git")
-        .args(["push", "origin", "HEAD"])
-        .output()?;
+    let output = Command::new("git").args(["push", "origin", "HEAD"]).output()?;
 
     if output.status.success() {
         Ok(())
@@ -117,19 +103,15 @@ pub fn git_push(dry_run: bool) -> Result<()> {
     }
 }
 
-/// 检查工作区是否存在未 staged 的变更
+/// Check whether the working tree has unstaged changes.
 pub fn has_unstaged_changes() -> Result<bool> {
-    let output = Command::new("git")
-        .args(["diff", "--quiet"])
-        .output()?;
+    let output = Command::new("git").args(["diff", "--quiet"]).output()?;
     Ok(!output.status.success())
 }
 
-/// 执行 git add .
+/// Stage all working tree changes.
 pub fn git_add_all() -> Result<()> {
-    let output = Command::new("git")
-        .args(["add", "."])
-        .output()?;
+    let output = Command::new("git").args(["add", "."]).output()?;
 
     if output.status.success() {
         Ok(())

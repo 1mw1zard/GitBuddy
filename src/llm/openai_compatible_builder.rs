@@ -7,37 +7,35 @@ pub(crate) struct OpenAICompatibleBuilder {
     api_key: String,
 }
 
-const PROMPT: &str = r#"Generate a concise commit message based on
-            the following git difference content. The generated message is plain text,
-             does not contain identifiers such as markdown "`",
-             and the generated content does not exceed 100 tokens.
-             Depending on the nature of the change, it starts with one of the following prefixes:
-              'build' (build system), 'chore' (chores), 'ci' (continuous integration),
-              'docs' (documentation), 'feat' (new feature), 'fix' (fix), 'perf' (performance),
-               'refactor' (refactoring), 'style' (style), 'test' (test):"#;
-
 impl OpenAICompatibleBuilder {
-    pub fn new(vendor: PromptModel, model: &str, api_key: &str) -> Self {
-        match vendor {
-            PromptModel::OpenAI => OpenAICompatibleBuilder {
-                url: String::from("https://api.openai.com"),
-                model: model.to_string(),
-                api_key: api_key.to_string(),
-            },
-            PromptModel::DeepSeek => OpenAICompatibleBuilder {
-                url: String::from("https://api.deepseek.com"),
-                model: model.to_string(),
-                api_key: api_key.to_string(),
-            }
+    pub fn new(vendor: PromptModel, model: &str, api_key: &str, base_url: &str) -> Self {
+        let url = if base_url.is_empty() {
+            default_base_url(vendor).to_string()
+        } else {
+            base_url.trim_end_matches('/').to_string()
+        };
+
+        Self {
+            url,
+            model: model.to_string(),
+            api_key: api_key.to_string(),
         }
     }
 
-    pub fn build(self) -> OpenAICompatible {
+    pub fn build(self, prompt: String) -> OpenAICompatible {
         OpenAICompatible {
             url: self.url,
             model: self.model,
-            prompt: PROMPT.to_string(),
+            prompt,
             api_key: self.api_key,
         }
+    }
+}
+
+fn default_base_url(vendor: PromptModel) -> &'static str {
+    match vendor {
+        PromptModel::OpenAI => "https://api.openai.com",
+        PromptModel::DeepSeek => "https://api.deepseek.com",
+        PromptModel::Ollama => "http://localhost:11434",
     }
 }

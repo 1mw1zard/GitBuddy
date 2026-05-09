@@ -5,19 +5,29 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
-use crate::ai::git::{git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes, git_add_all};
+use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
 use crate::llm;
+use crate::llm::PromptModel;
+use crate::prompt::Prompt;
 
 mod git;
 
-/// L1 阈值：完整 diff 的安全上限（字符数）
+/// Safe character limit for sending the full diff.
 const MAX_DIFF_CHARS_FULL: usize = 8_000;
-/// L2 阈值：保留 header + 部分代码的上限（字符数）
+/// Character limit for sending diff headers plus selected code lines.
 const MAX_DIFF_CHARS_SUMMARY: usize = 30_000;
-/// L2 模式下每个文件保留的最大代码行数
+/// Maximum number of code lines retained per file in summary mode.
 const MAX_LINES_PER_FILE: usize = 20;
 
-pub fn handler(push: bool, dry_run: bool, auto_stage: bool, auto_commit: bool) -> Result<()> {
+pub fn handler(
+    push: bool,
+    dry_run: bool,
+    auto_stage: bool,
+    auto_commit: bool,
+    vendor: Option<PromptModel>,
+    model: Option<String>,
+    prompt: Prompt,
+) -> Result<()> {
     if !is_git_installed() {
         return Err(anyhow!("Git is not installed. Please install git first."));
     }
@@ -49,10 +59,10 @@ pub fn handler(push: bool, dry_run: bool, auto_stage: bool, auto_commit: bool) -
     println!("Generating commit message by LLM...");
 
     let start = Instant::now();
-    let llm_result = llm::llm_request(&prompt_content)?;
+    let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt)?;
     let duration = start.elapsed();
 
-    // 流式逐字输出 commit message
+    // Print the generated commit message with a typewriter effect.
     println!("--------------------------------------");
     let colored_msg = llm_result.commit_message.cyan().bold().to_string();
     typewriter_print(&colored_msg, 25)?;
@@ -65,7 +75,7 @@ pub fn handler(push: bool, dry_run: bool, auto_stage: bool, auto_commit: bool) -
     );
     println!("{}", usage_message.truecolor(128, 128, 128));
 
-    if !auto_commit && !llm::confirm_commit()? {
+    if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
         println!("{}", "Cancel commit".red());
         return Ok(());
     }
@@ -82,25 +92,25 @@ pub fn handler(push: bool, dry_run: bool, auto_stage: bool, auto_commit: bool) -
     Ok(())
 }
 
-/// 三层降级策略构建发送给 LLM 的 prompt：
+/// Build the LLM prompt using a three-level fallback strategy:
 ///
-/// - L1 Full:    diff 字符数 <= 8K   → 发送完整 diff
-/// - L2 Summary: diff 字符数 8K~30K → 保留 diff header，每个文件只留前 20 行代码
-/// - L3 Stats:   diff 字符数 > 30K   → 只发送 `git diff --stat` 的统计信息
+/// - L1 Full: send the full diff when it is at most 8K characters.
+/// - L2 Summary: keep diff headers and up to 20 code lines per file.
+/// - L3 Stats: use only `git diff --stat` when the diff is too large.
 fn build_prompt(diff: &str) -> Result<String> {
-    // 快速路径：字节层面未超限
+    // Fast path for ASCII-heavy diffs.
     if diff.len() <= MAX_DIFF_CHARS_FULL {
         return Ok(diff.to_string());
     }
 
     let char_count = diff.chars().count();
 
-    // L1: 完整模式
+    // L1: full diff mode.
     if char_count <= MAX_DIFF_CHARS_FULL {
         return Ok(diff.to_string());
     }
 
-    // L2: 摘要模式 - 保留 header，每个文件只留前 N 行代码
+    // L2: summary mode with headers and a limited number of code lines.
     if char_count <= MAX_DIFF_CHARS_SUMMARY {
         let summary = smart_truncate_diff(diff, MAX_LINES_PER_FILE);
         println!(
@@ -114,7 +124,7 @@ fn build_prompt(diff: &str) -> Result<String> {
         return Ok(summary);
     }
 
-    // L3: 极简模式 - 使用 git diff --stat
+    // L3: compact mode using git diff --stat.
     println!(
         "{}",
         format!(
@@ -131,7 +141,7 @@ fn build_prompt(diff: &str) -> Result<String> {
             stats
         ))
     } else {
-        // 兜底：如果连 stats 都拿不到，至少给出文件名列表
+        // Fall back to filenames if stats are unavailable.
         let filenames = git_stage_filenames()?.join("\n");
         Ok(format!(
             "Generate a concise commit message for changes in these files:\n\n{}",
@@ -140,8 +150,7 @@ fn build_prompt(diff: &str) -> Result<String> {
     }
 }
 
-/// 智能截断：保留所有 diff header（文件名、hunk 位置等），
-/// 每个文件最多保留 `max_lines` 行实际代码（以 `+` `-` ` ` 开头）。
+/// Keep all diff headers and retain up to `max_lines` code lines per file.
 fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
     let mut result = String::new();
     let mut lines_remaining = 0;
@@ -153,11 +162,11 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
             result.push_str(line);
             result.push('\n');
         } else if line.starts_with("@@ ") {
-            // hunk header 保留，不消耗代码行配额
+            // Keep hunk headers without consuming the code-line budget.
             result.push_str(line);
             result.push('\n');
         } else if line.starts_with('+') || line.starts_with('-') || line.starts_with(' ') {
-            // 实际代码行
+            // Actual code lines.
             if lines_remaining > 0 {
                 result.push_str(line);
                 result.push('\n');
@@ -166,7 +175,7 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
                 skipped_any = true;
             }
         } else {
-            // 其他 header 行（index、---、+++ 等）
+            // Other header lines, such as index, ---, and +++.
             result.push_str(line);
             result.push('\n');
         }
