@@ -53,6 +53,8 @@ Using GitBuddy is straightforward. After making your changes, run the following 
 gitbuddy ai
 ```
 
+Or simply run `gitbuddy` for auto-stage and auto-commit mode.
+
 ## Support models
 
 | Vendor      | Model(s)                        | Support |

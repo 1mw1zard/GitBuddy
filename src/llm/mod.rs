@@ -4,7 +4,7 @@ mod openai_compatible_builder;
 use crate::config;
 use crate::config::ModelParameters;
 use crate::prompt::Prompt;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use colored::Colorize;
 use openai_compatible_builder::OpenAICompatibleBuilder;
@@ -29,7 +29,7 @@ impl PromptModel {
     pub fn default_model(&self) -> String {
         match self {
             PromptModel::OpenAI => "gpt-3.5-turbo".to_string(),
-            PromptModel::DeepSeek => "deepseek-chat".to_string(),
+            PromptModel::DeepSeek => "deepseek v4 flash".to_string(),
             PromptModel::Ollama => "ollama".to_string(),
         }
     }
@@ -43,18 +43,6 @@ pub struct LLMResult {
     pub total_tokens: i64,
 }
 
-struct RequestsWrap {
-    vendor: PromptModel,
-    model: String,
-    api_key: String,
-}
-
-impl RequestsWrap {
-    fn new(vendor: PromptModel, model: String, api_key: String) -> Self {
-        RequestsWrap { vendor, model, api_key }
-    }
-}
-
 pub fn llm_request(
     diff_content: &str,
     vendor: Option<PromptModel>,
@@ -63,15 +51,18 @@ pub fn llm_request(
 ) -> Result<LLMResult> {
     let config = config::get_config()?;
 
-    let (model_config, prompt_model) = config.model(vendor).unwrap();
+    let (model_config, prompt_model) = config
+        .model(vendor)
+        .ok_or_else(|| anyhow!("No model selected. Run `gitbuddy config` first."))?;
 
-    let model = model.unwrap_or(model_config.model.clone());
+    let model = model.unwrap_or_else(|| model_config.model.clone());
     println!("use model: {model}");
 
     get_commit_message(
         prompt_model,
         model.as_str(),
-        model_config.api_key.clone().unwrap_or("".into()).as_str(),
+        model_config.api_key.clone().unwrap_or_default().as_str(),
+        model_config.base_url.as_str(),
         diff_content,
         config.model_params(),
         prompt,
@@ -82,28 +73,27 @@ fn get_commit_message(
     vendor: PromptModel,
     model: &str,
     api_key: &str,
+    base_url: &str,
     diff_content: &str,
     option: ModelParameters,
     prompt: Prompt,
 ) -> Result<LLMResult> {
-    let builder = OpenAICompatibleBuilder::new(vendor, model, api_key);
+    let builder = OpenAICompatibleBuilder::new(vendor, model, api_key, base_url);
 
-    // generate http request
     let m = builder.build(prompt.value().to_string());
     let result = m.request(diff_content, option)?;
     Ok(result)
 }
 
-pub fn confirm_commit(commit_message: &str) -> bool {
+pub fn confirm_commit(commit_message: &str) -> Result<bool> {
     println!("--------------------------------------");
     println!("{}", commit_message.cyan().bold());
     println!("--------------------------------------");
     print!("Are you sure you want to commit? (Y/n) ");
     let mut input = String::new();
 
-    // flush
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut input).expect("Failed to read line");
+    std::io::stdout().flush()?;
+    std::io::stdin().read_line(&mut input)?;
 
-    return input.trim() == "y" || input.trim() == "Y" || input.trim() == "";
+    Ok(input.trim() == "y" || input.trim() == "Y" || input.trim() == "")
 }

@@ -1,18 +1,22 @@
 use crate::llm::PromptModel;
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
+
+pub use vendor::{DefaultConfig, ModelConfig, ModelParameters};
 
 mod storage;
 mod vendor;
 
-/// Update or create configuration for a specific model
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
-    let mut config = GlobalConfig::load().unwrap_or_else(|| create_default_config());
+    let mut config = GlobalConfig::load().unwrap_or_else(GlobalConfig::new);
 
     let model_config = ModelConfig {
-        api_key: Some(api_key.to_string()),
+        api_key: if api_key.is_empty() {
+            None
+        } else {
+            Some(api_key.to_string())
+        },
         model: model.to_string(),
-        base_url: get_default_base_url(vendor),
+        base_url: default_base_url(vendor).to_string(),
     };
 
     match vendor {
@@ -26,37 +30,19 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
     Ok(())
 }
 
-fn get_default_base_url(vendor: &PromptModel) -> String {
+fn default_base_url(vendor: &PromptModel) -> &'static str {
     match vendor {
-        PromptModel::OpenAI => "https://api.openai.com/v1".to_string(),
-        PromptModel::DeepSeek => "https://api.deepseek.com/v1".to_string(),
-        PromptModel::Ollama => "http://localhost:11434".to_string(),
-    }
-}
-
-fn create_default_config() -> GlobalConfig {
-    GlobalConfig {
-        default: DefaultConfig {
-            default_service: PromptModel::DeepSeek,
-            timeout: 30,
-        },
-        openai: None,
-        deepseek: None,
-        ollama: None,
-        model_parameters: Some(ModelParameters {
-            temperature: 0.1,
-            top_p: 0.75,
-            top_k: 5,
-            max_tokens: 1024,
-        }),
+        PromptModel::OpenAI => "https://api.openai.com",
+        PromptModel::DeepSeek => "https://api.deepseek.com",
+        PromptModel::Ollama => "http://localhost:11434",
     }
 }
 
 pub fn get_config() -> Result<GlobalConfig> {
-    GlobalConfig::load().ok_or_else(|| anyhow!("Config not found."))
+    GlobalConfig::load().ok_or_else(|| anyhow!("Config not found. Run `gitbuddy config` first."))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GlobalConfig {
     pub default: DefaultConfig,
     pub openai: Option<ModelConfig>,
@@ -66,19 +52,25 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
-    /// Create a new configuration with default values
     pub fn new() -> Self {
-        create_default_config()
+        Self {
+            default: DefaultConfig {
+                default_service: PromptModel::DeepSeek,
+                timeout: 30,
+            },
+            openai: None,
+            deepseek: None,
+            ollama: None,
+            model_parameters: Some(ModelParameters::default()),
+        }
     }
 
-    /// Save config to file
     pub fn save(&self) -> Result<()> {
         let content = toml::to_string(self)?;
         storage::save_config(&content)?;
         Ok(())
     }
 
-    /// Load config from file
     pub fn load() -> Option<Self> {
         let content = storage::read_config().unwrap_or_default();
         match toml::from_str(content.as_str()) {
@@ -90,7 +82,6 @@ impl GlobalConfig {
         }
     }
 
-    // load model
     pub fn model(&self, vendor: Option<PromptModel>) -> Option<(&ModelConfig, PromptModel)> {
         match vendor.unwrap_or(self.default.default_service) {
             PromptModel::OpenAI => self.openai.as_ref().map(|cfg| (cfg, PromptModel::OpenAI)),
@@ -100,80 +91,47 @@ impl GlobalConfig {
     }
 
     pub fn model_params(&self) -> ModelParameters {
-        match &self.model_parameters {
-            Some(mp) => mp.clone(),
-            None => ModelParameters {
-                max_tokens: 1024,
-                temperature: 0.0,
-                top_p: 0.75,
-                top_k: 10,
-            },
-        }
+        self.model_parameters.unwrap_or_default()
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ModelConfig {
-    pub api_key: Option<String>,
-    pub model: String,
-    pub base_url: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DefaultConfig {
-    pub default_service: PromptModel,
-    pub timeout: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ModelParameters {
-    pub temperature: f64,
-    pub top_p: f64,
-    pub top_k: u32,
-    pub max_tokens: u32,
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::config::vendor::ModelConfig;
-
     use super::*;
 
     #[test]
-    fn test_config() {
-        let params = ModelConfig {
-            model: String::from("gpt-3.5-turbo"),
-            api_key: Some(String::from("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")),
-        };
-
-        let mut cfg = GlobalConfig::new();
-        // cfg.set_model(UseModel::DeepSeek(params));
-
+    fn new_config_serializes() {
+        let cfg = GlobalConfig::new();
         let toml_str = toml::to_string(&cfg).unwrap();
-        println!("{}", toml_str);
+
+        assert!(toml_str.contains("[default]"));
+        assert!(toml_str.contains("default_service = \"deepseek\""));
     }
 
     #[test]
-    fn config_serialization() {
+    fn config_deserializes_vendor_sections() {
         let toml_str = r#"
-[model.DeepSeek]
-model = "gpt-3.5-turbo"
+[default]
+default_service = "deepseek"
+timeout = 30
+
+[deepseek]
+model = "deepseek-chat"
 api_key = "sk-12345678"
+base_url = "https://api.deepseek.com"
         "#;
 
-        // let cfg: GlobalConfig = toml::from_str(toml_str).unwrap();
-    }
+        let cfg: GlobalConfig = toml::from_str(toml_str).unwrap();
+        let (model_config, vendor) = cfg.model(None).unwrap();
 
-    #[test]
-    fn save_config() {
-        let mut cfg = GlobalConfig::new();
-
-        // let params = OpenAILikeParams {
-        //     model: String::from("gpt-3.5-turbo"),
-        //     api_key: String::from("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"),
-        // };
-
-        // cfg.set_model(UseModel::DeepSeek(params));
-        // cfg.save();
+        assert_eq!(vendor, PromptModel::DeepSeek);
+        assert_eq!(model_config.model, "deepseek-chat");
+        assert_eq!(model_config.api_key.as_deref(), Some("sk-12345678"));
     }
 }

@@ -1,11 +1,14 @@
-use crate::llm::PromptModel;
+use anyhow::Result;
 use clap::{Parser, Subcommand};
-use prompt::Prompt;
+use colored::Colorize;
 
 mod ai;
 mod config;
 mod llm;
 mod prompt;
+
+use crate::llm::PromptModel;
+use prompt::Prompt;
 
 #[derive(Parser)]
 #[command(
@@ -38,8 +41,6 @@ enum Commands {
         /// test argument, generate commit message but not commit
         #[arg(long, default_value_t = false)]
         dry_run: bool,
-        // #[arg(long, default_value_t=String::from("deepseek"))]
-        // vendor: String,
     },
     Config {
         #[arg(value_enum)]
@@ -52,15 +53,18 @@ enum Commands {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("{} {}", "Error:".red().bold(), e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Ai {
-            push,
-            dry_run,
-            // vendor,
-        }) => {
-            ai::handler(*push, *dry_run, cli.vendor, cli.model, cli.prompt);
+        Some(Commands::Ai { push, dry_run }) => {
+            ai::handler(*push, *dry_run, false, false, cli.vendor, cli.model.clone(), cli.prompt)?;
         }
         Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model {
@@ -69,8 +73,12 @@ fn main() {
                 vendor.default_model().to_string()
             };
 
-            config::handler(vendor, api_key, model.as_str()).unwrap();
+            config::handler(vendor, api_key, model.as_str())?;
         }
-        None => ai::handler(false, false, cli.vendor, cli.model, cli.prompt),
+        None => {
+            ai::handler(false, false, true, true, cli.vendor, cli.model.clone(), cli.prompt)?;
+        }
     }
+
+    Ok(())
 }
