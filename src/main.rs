@@ -64,7 +64,7 @@ fn run() -> Result<()> {
 
     match &cli.command {
         Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run, false, cli.vendor, cli.model.clone(), cli.prompt)?;
+            ai::handler(*push, *dry_run, false, false, cli.vendor, cli.model.clone(), cli.prompt)?;
         }
         Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model {
@@ -76,7 +76,7 @@ fn run() -> Result<()> {
             config::handler(vendor, api_key, model.as_str())?;
         }
         None => {
-            ai::handler(false, false, true, cli.vendor, cli.model.clone(), cli.prompt)?;
+            ai::handler(false, false, true, true, cli.vendor, cli.model.clone(), cli.prompt)?;
         }
     }
 

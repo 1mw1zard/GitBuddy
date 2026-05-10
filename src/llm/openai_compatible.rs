@@ -47,6 +47,8 @@ struct OpenAIResponseChoice {
 struct OpenAIResponseChoiceMessage {
     role: String,
     content: String,
+    #[serde(rename = "reasoning_content")]
+    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -105,12 +107,19 @@ impl OpenAICompatible {
                 .first()
                 .ok_or_else(|| anyhow!("No choices returned from API"))?;
 
+            let mut msg = choice.message.content.trim().to_string();
+            if msg.is_empty() {
+                if let Some(ref reasoning) = choice.message.reasoning_content {
+                    msg = reasoning.trim().to_string();
+                }
+            }
             Ok(LLMResult {
-                commit_message: choice.message.content.trim().to_string(),
+                commit_message: msg,
                 total_tokens: response_json.usage.total_tokens,
                 prompt_tokens: response_json.usage.prompt_tokens,
                 completion_tokens: response_json.usage.completion_tokens,
                 prompt_cache_hit_tokens: response_json.usage.prompt_cache_hit_tokens,
+                reasoning_content: choice.message.reasoning_content.clone(),
                 model: self.model.clone(),
             })
         } else {

@@ -23,6 +23,7 @@ pub fn handler(
     push: bool,
     dry_run: bool,
     auto_stage: bool,
+    auto_commit: bool,
     vendor: Option<PromptModel>,
     model: Option<String>,
     prompt: Prompt,
@@ -71,7 +72,6 @@ pub fn handler(
     print!("{}", "                              ".truecolor(128, 128, 128));
     print!("{}", version.yellow().bold());
     println!("{}", " |___/ ".truecolor(128, 128, 128));
-    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".truecolor(128, 128, 128));
     println!();
 
     let start = Instant::now();
@@ -85,6 +85,18 @@ pub fn handler(
     );
 
     let msg = llm_result.commit_message.trim();
+    if msg.is_empty() {
+        eprintln!("{}", "⚠️  LLM returned an empty commit message.".red().bold());
+        if let Some(ref reasoning) = llm_result.reasoning_content {
+            eprintln!("{}", "ℹ️  The model produced reasoning content instead:".yellow());
+            eprintln!("{}", reasoning.cyan());
+        }
+        return Err(anyhow!(
+            "Empty commit message. This usually happens with reasoning models (e.g., DeepSeek-R1) \
+             that output thinking tokens in a separate field. \
+             Try using a standard chat model like 'deepseek-chat'."
+        ));
+    }
     print_commit_message(msg)?;
 
     let duration_str = if duration.as_secs() >= 1 {
@@ -119,7 +131,7 @@ pub fn handler(
     );
     println!();
 
-    if !llm::confirm_commit(&llm_result.commit_message)? {
+    if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
         println!("{} {}", "❌".red().bold(), "Commit cancelled".red());
         return Ok(());
     }
@@ -137,8 +149,8 @@ pub fn handler(
         let mut input = String::new();
         std::io::stdout().flush()?;
         std::io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim();
-        trimmed == "y" || trimmed == "Y" || trimmed.is_empty()
+        let line = input.trim_end_matches('\n').trim_end_matches('\r');
+        line == "y" || line == "Y" || line.is_empty()
     };
 
     if should_push {

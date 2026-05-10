@@ -42,6 +42,7 @@ pub struct LLMResult {
     pub prompt_tokens: i64,
     pub total_tokens: i64,
     pub prompt_cache_hit_tokens: Option<i64>,
+    pub reasoning_content: Option<String>,
     pub model: String,
 }
 
