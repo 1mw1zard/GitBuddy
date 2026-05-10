@@ -23,7 +23,6 @@ pub fn handler(
     push: bool,
     dry_run: bool,
     auto_stage: bool,
-    auto_commit: bool,
     vendor: Option<PromptModel>,
     model: Option<String>,
     prompt: Prompt,
@@ -63,11 +62,15 @@ pub fn handler(
     );
     let prompt_content = build_prompt(&enriched)?;
 
-    println!(
-        "{} {}",
-        "🤖 GitBuddy".bold(),
-        format!("v{}", env!("CARGO_PKG_VERSION")).truecolor(128, 128, 128)
-    );
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    println!("{}", "  ____ _ _   ____            _     _       ".truecolor(128, 128, 128));
+    println!("{}", " / ___(_) |_| __ ) _   _  __| | __| |_   _ ".truecolor(128, 128, 128));
+    println!("{}", "| |  _| | __|  _ \\| | | |/ _` |/ _` | | | |".truecolor(128, 128, 128));
+    println!("{}", "| |_| | | |_| |_) | |_| | (_| | (_| | |_| |".truecolor(128, 128, 128));
+    println!("{}", " \\____|_|\\__|____/ \\__,_|\\__,_|\\__,_|\\__, |".truecolor(128, 128, 128));
+    print!("{}", "                              ".truecolor(128, 128, 128));
+    print!("{}", version.yellow().bold());
+    println!("{}", " |___/ ".truecolor(128, 128, 128));
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".truecolor(128, 128, 128));
     println!();
 
@@ -116,7 +119,7 @@ pub fn handler(
     );
     println!();
 
-    if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
+    if !llm::confirm_commit(&llm_result.commit_message)? {
         println!("{} {}", "❌".red().bold(), "Commit cancelled".red());
         return Ok(());
     }
