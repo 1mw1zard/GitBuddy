@@ -1,6 +1,4 @@
-use std::io::Write;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
@@ -40,53 +38,94 @@ pub fn handler(
     if filenames.is_empty() {
         if auto_stage {
             if has_unstaged_changes()? {
-                println!("No staged changes found. Auto-staging all changes...");
+                println!("📦 No staged changes found. Auto-staging all changes...");
                 git_add_all()?;
-                println!("{}", "Changes staged.".green());
+                println!("{} {}", "✅".green().bold(), "Changes staged.".green());
             } else {
-                println!("No changes to commit.");
+                println!("ℹ️  No changes to commit.");
                 return Ok(());
             }
         } else {
-            println!("No files added to staging! Did you forget to run `git add` ?");
+            println!("⚠️  No files added to staging! Did you forget to run `git add`?");
             return Ok(());
         }
     }
 
     let diff_content = git_stage_diff()?;
-    let prompt_content = build_prompt(&diff_content)?;
+    let stats = git_stage_stats().unwrap_or_default();
+    let filenames = git_stage_filenames()?.join("\n");
 
-    println!("Generating commit message by LLM...");
+    let enriched = format!(
+        "Files changed:\n{}\n\nChange statistics:\n{}\n\n{}",
+        filenames, stats, diff_content
+    );
+    let prompt_content = build_prompt(&enriched)?;
+
+    println!("{}", "🤖 GitBuddy".bold());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".truecolor(128, 128, 128));
+    println!();
 
     let start = Instant::now();
+    println!("🧠 Analyzing code changes...");
     let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt)?;
     let duration = start.elapsed();
-
-    // Print the generated commit message with a typewriter effect.
-    println!("--------------------------------------");
-    let colored_msg = llm_result.commit_message.cyan().bold().to_string();
-    typewriter_print(&colored_msg, 25)?;
-    println!();
-    println!("--------------------------------------");
-
-    let usage_message = format!(
-        "duration={:?} - Usage={}(completion={}, prompt={})]",
-        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens
+    println!(
+        "{} {}",
+        "🎯 Model:".truecolor(128, 128, 128),
+        llm_result.model.cyan()
     );
-    println!("{}", usage_message.truecolor(128, 128, 128));
+
+    let msg = llm_result.commit_message.trim();
+    let max_line_width = msg.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    let inner_width = max_line_width.max(40);
+
+    println!();
+    println!("  ╭{}╮", "─".repeat(inner_width + 2));
+    for line in msg.lines() {
+        let padded = format!("{:<width$}", line, width = inner_width);
+        println!("  │ {} │", padded.cyan().bold());
+    }
+    println!("  ╰{}╯", "─".repeat(inner_width + 2));
+
+    let duration_str = if duration.as_secs() >= 1 {
+        format!("{:.2}s", duration.as_secs_f64())
+    } else {
+        format!("{}ms", duration.as_millis())
+    };
+
+    println!();
+    println!(
+        "{}",
+        format!(
+            "⏱  {}  ·  🪙  {} tokens  ·  📝  {} prompt  ·  ✨  {} completion",
+            duration_str,
+            llm_result.total_tokens,
+            llm_result.prompt_tokens,
+            llm_result.completion_tokens
+        )
+        .truecolor(128, 128, 128)
+    );
+    println!();
 
     if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
-        println!("{}", "Cancel commit".red());
+        println!("{} {}", "❌".red().bold(), "Commit cancelled".red());
         return Ok(());
     }
 
     git::git_commit(llm_result.commit_message.trim(), dry_run)?;
-    println!("{}", "Commit success!!!".green().bold());
+    println!(
+        "{} {}",
+        "✅".green().bold(),
+        "Commit successful".green().bold()
+    );
 
-    // push
     if push {
         git::git_push(dry_run)?;
-        println!("{}", "Push success!!!".green());
+        println!(
+            "{} {}",
+            "🚀".green().bold(),
+            "Push successful".green().bold()
+        );
     }
 
     Ok(())
@@ -116,7 +155,7 @@ fn build_prompt(diff: &str) -> Result<String> {
         println!(
             "{}",
             format!(
-                "Note: Diff is large ({} chars), showing file headers with up to {} code lines per file.",
+                "📄 Note: Diff is large ({} chars), showing file headers with up to {} code lines per file.",
                 char_count, MAX_LINES_PER_FILE
             )
             .yellow()
@@ -190,15 +229,6 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
     } else {
         result
     }
-}
-
-fn typewriter_print(text: &str, delay_ms: u64) -> Result<()> {
-    for ch in text.chars() {
-        print!("{}", ch);
-        std::io::stdout().flush()?;
-        thread::sleep(Duration::from_millis(delay_ms));
-    }
-    Ok(())
 }
 
 fn is_git_directory() -> Result<bool> {

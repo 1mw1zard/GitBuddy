@@ -107,6 +107,7 @@ impl OpenAICompatible {
                 total_tokens: response_json.usage.total_tokens,
                 prompt_tokens: response_json.usage.prompt_tokens,
                 completion_tokens: response_json.usage.completion_tokens,
+                model: self.model.clone(),
             })
         } else {
             let status = response.status();
