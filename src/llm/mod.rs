@@ -41,6 +41,9 @@ pub struct LLMResult {
     pub completion_tokens: i64,
     pub prompt_tokens: i64,
     pub total_tokens: i64,
+    pub prompt_cache_hit_tokens: Option<i64>,
+    pub reasoning_content: Option<String>,
+    pub model: String,
 }
 
 pub fn llm_request(
@@ -56,13 +59,12 @@ pub fn llm_request(
         .ok_or_else(|| anyhow!("No model selected. Run `gitbuddy config` first."))?;
 
     let model = model.unwrap_or_else(|| model_config.model.clone());
-    println!("use model: {model}");
 
     get_commit_message(
         prompt_model,
         model.as_str(),
         model_config.api_key.clone().unwrap_or_default().as_str(),
-        model_config.base_url.as_str(),
+        model_config.base_url.as_deref().unwrap_or(""),
         diff_content,
         config.model_params(),
         prompt,
@@ -85,11 +87,12 @@ fn get_commit_message(
     Ok(result)
 }
 
-pub fn confirm_commit(commit_message: &str) -> Result<bool> {
-    println!("--------------------------------------");
-    println!("{}", commit_message.cyan().bold());
-    println!("--------------------------------------");
-    print!("Are you sure you want to commit? (Y/n) ");
+pub fn confirm_commit(_commit_message: &str) -> Result<bool> {
+    print!("{} Commit with this message? [", "💾".yellow().bold());
+    print!("{}", "Y".green().bold());
+    print!("/");
+    print!("{}", "n".red());
+    print!("] ");
     let mut input = String::new();
 
     std::io::stdout().flush()?;

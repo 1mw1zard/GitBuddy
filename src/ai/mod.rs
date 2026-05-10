@@ -13,9 +13,9 @@ use crate::prompt::Prompt;
 mod git;
 
 /// Safe character limit for sending the full diff.
-const MAX_DIFF_CHARS_FULL: usize = 8_000;
+const MAX_DIFF_CHARS_FULL: usize = 30_000;
 /// Character limit for sending diff headers plus selected code lines.
-const MAX_DIFF_CHARS_SUMMARY: usize = 30_000;
+const MAX_DIFF_CHARS_SUMMARY: usize = 100_000;
 /// Maximum number of code lines retained per file in summary mode.
 const MAX_LINES_PER_FILE: usize = 20;
 
@@ -40,53 +40,121 @@ pub fn handler(
     if filenames.is_empty() {
         if auto_stage {
             if has_unstaged_changes()? {
-                println!("No staged changes found. Auto-staging all changes...");
+                println!("📦 No staged changes found. Auto-staging all changes...");
                 git_add_all()?;
-                println!("{}", "Changes staged.".green());
+                println!("{} {}", "✅".green().bold(), "Changes staged.".green());
             } else {
-                println!("No changes to commit.");
+                println!("ℹ️  No changes to commit.");
                 return Ok(());
             }
         } else {
-            println!("No files added to staging! Did you forget to run `git add` ?");
+            println!("⚠️  No files added to staging! Did you forget to run `git add`?");
             return Ok(());
         }
     }
 
     let diff_content = git_stage_diff()?;
-    let prompt_content = build_prompt(&diff_content)?;
+    let stats = git_stage_stats().unwrap_or_default();
+    let filenames = git_stage_filenames()?.join("\n");
 
-    println!("Generating commit message by LLM...");
+    let enriched = format!(
+        "Files changed:\n{}\n\nChange statistics:\n{}\n\n{}",
+        filenames, stats, diff_content
+    );
+    let prompt_content = build_prompt(&enriched)?;
+
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    println!("{}", "  ____ _ _   ____            _     _       ".truecolor(128, 128, 128));
+    println!("{}", " / ___(_) |_| __ ) _   _  __| | __| |_   _ ".truecolor(128, 128, 128));
+    println!("{}", "| |  _| | __|  _ \\| | | |/ _` |/ _` | | | |".truecolor(128, 128, 128));
+    println!("{}", "| |_| | | |_| |_) | |_| | (_| | (_| | |_| |".truecolor(128, 128, 128));
+    println!("{}", " \\____|_|\\__|____/ \\__,_|\\__,_|\\__,_|\\__, |".truecolor(128, 128, 128));
+    print!("{}", "                              ".truecolor(128, 128, 128));
+    print!("{}", version.yellow().bold());
+    println!("{}", " |___/ ".truecolor(128, 128, 128));
+    println!();
 
     let start = Instant::now();
+    println!("🧠 Analyzing code changes...");
     let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt)?;
     let duration = start.elapsed();
-
-    // Print the generated commit message with a typewriter effect.
-    println!("--------------------------------------");
-    let colored_msg = llm_result.commit_message.cyan().bold().to_string();
-    typewriter_print(&colored_msg, 25)?;
-    println!();
-    println!("--------------------------------------");
-
-    let usage_message = format!(
-        "duration={:?} - Usage={}(completion={}, prompt={})]",
-        duration, llm_result.total_tokens, llm_result.completion_tokens, llm_result.prompt_tokens
+    println!(
+        "{} {}",
+        "🎯 Model:".truecolor(128, 128, 128),
+        llm_result.model.cyan()
     );
-    println!("{}", usage_message.truecolor(128, 128, 128));
+
+    let msg = llm_result.commit_message.trim();
+    if msg.is_empty() {
+        eprintln!("{}", "⚠️  LLM returned an empty commit message.".red().bold());
+        if let Some(ref reasoning) = llm_result.reasoning_content {
+            eprintln!("{}", "ℹ️  The model produced reasoning content instead:".yellow());
+            eprintln!("{}", reasoning.cyan());
+        }
+        return Err(anyhow!(
+            "Empty commit message. This usually happens with reasoning models (e.g., DeepSeek-R1) \
+             that output thinking tokens in a separate field. \
+             Try using a standard chat model like 'deepseek-chat'."
+        ));
+    }
+    print_commit_message(msg)?;
+
+    let duration_str = if duration.as_secs() >= 1 {
+        format!("{:.2}s", duration.as_secs_f64())
+    } else {
+        format!("{}ms", duration.as_millis())
+    };
+
+    let cached = llm_result.prompt_cache_hit_tokens.unwrap_or(0);
+    let cached_part = if cached > 0 {
+        format!(" (+ {} cached)", cached)
+    } else {
+        String::new()
+    };
+
+    println!();
+    println!(
+        "{} {}",
+        "⏱".truecolor(128, 128, 128),
+        duration_str.truecolor(128, 128, 128)
+    );
+    println!(
+        "{}",
+        format!(
+            "Token usage: total={} input={}{} output={}",
+            llm_result.total_tokens,
+            llm_result.prompt_tokens,
+            cached_part,
+            llm_result.completion_tokens
+        )
+        .truecolor(128, 128, 128)
+    );
+    println!();
 
     if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
-        println!("{}", "Cancel commit".red());
+        println!("{} {}", "❌".red().bold(), "Commit cancelled".red());
         return Ok(());
     }
 
     git::git_commit(llm_result.commit_message.trim(), dry_run)?;
-    println!("{}", "Commit success!!!".green().bold());
 
-    // push
-    if push {
+    let should_push = if push {
+        true
+    } else {
+        print!("{} Push to remote? [", "🚀".yellow().bold());
+        print!("{}", "Y".green().bold());
+        print!("/");
+        print!("{}", "n".red());
+        print!("] ");
+        let mut input = String::new();
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut input)?;
+        let line = input.trim_end_matches('\n').trim_end_matches('\r');
+        line == "y" || line == "Y" || line.is_empty()
+    };
+
+    if should_push {
         git::git_push(dry_run)?;
-        println!("{}", "Push success!!!".green());
     }
 
     Ok(())
@@ -116,7 +184,7 @@ fn build_prompt(diff: &str) -> Result<String> {
         println!(
             "{}",
             format!(
-                "Note: Diff is large ({} chars), showing file headers with up to {} code lines per file.",
+                "📄 Note: Diff is large ({} chars), showing file headers with up to {} code lines per file.",
                 char_count, MAX_LINES_PER_FILE
             )
             .yellow()
@@ -192,11 +260,49 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
     }
 }
 
-fn typewriter_print(text: &str, delay_ms: u64) -> Result<()> {
-    for ch in text.chars() {
-        print!("{}", ch);
-        std::io::stdout().flush()?;
-        thread::sleep(Duration::from_millis(delay_ms));
+fn terminal_width() -> Option<usize> {
+    std::process::Command::new("tput")
+        .arg("cols")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8_lossy(&output.stdout).trim().parse().ok())
+}
+
+fn print_commit_message(msg: &str) -> Result<()> {
+    let max_line_width = msg.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    let inner_width = max_line_width.max(40);
+    let box_width = inner_width + 6; // 2 indent + 2 border + 2 padding
+
+    let term_w = terminal_width().unwrap_or(120);
+
+    if box_width <= term_w {
+        // Terminal is wide enough: draw rounded box with typewriter effect.
+        println!("  ╭{}╮", "─".repeat(inner_width + 2));
+        for line in msg.lines() {
+            let padded = format!("{:<width$}", line, width = inner_width);
+            print!("  │ ");
+            let colored = padded.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!(" │");
+        }
+        println!("  ╰{}╯", "─".repeat(inner_width + 2));
+    } else {
+        // Terminal is too narrow: skip the box, just typewriter-print.
+        println!();
+        for line in msg.lines() {
+            let colored = line.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!();
+        }
+        println!();
     }
     Ok(())
 }

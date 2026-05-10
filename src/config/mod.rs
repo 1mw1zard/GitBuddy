@@ -16,7 +16,7 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
             Some(api_key.to_string())
         },
         model: model.to_string(),
-        base_url: default_base_url(vendor).to_string(),
+        base_url: None,
     };
 
     match vendor {
@@ -28,14 +28,6 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
     config.save()?;
     println!("Config saved.");
     Ok(())
-}
-
-fn default_base_url(vendor: &PromptModel) -> &'static str {
-    match vendor {
-        PromptModel::OpenAI => "https://api.openai.com",
-        PromptModel::DeepSeek => "https://api.deepseek.com",
-        PromptModel::Ollama => "http://localhost:11434",
-    }
 }
 
 pub fn get_config() -> Result<GlobalConfig> {
@@ -124,7 +116,6 @@ timeout = 30
 [deepseek]
 model = "deepseek-chat"
 api_key = "sk-12345678"
-base_url = "https://api.deepseek.com"
         "#;
 
         let cfg: GlobalConfig = toml::from_str(toml_str).unwrap();

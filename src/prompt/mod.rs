@@ -34,17 +34,31 @@ impl Prompt {
     }
 }
 
-pub const PROMPT: &str = r###"You are a professional Git assistant. Based on the provided code changes, generate a concise Git Commit Message following the format:
-<type>(<optional scope>): <subject>
+pub const PROMPT: &str = r###"You are an elite software architect writing commit messages. Analyze the provided code changes deeply and generate a commit message that demonstrates technical insight and clarity.
 
-[optional description]
+Format:
+<type>(<scope>): <imperative mood, strong verb + specific intent>
 
-[optional footer(s)]
+[Optional body — highly encouraged for non-trivial changes]
+- Motivation: WHY this change was necessary (not just WHAT changed)
+- Technical decision: What approach was chosen and what trade-offs were made
+- Impact: Who or what is affected by this change
 
 Requirements:
-1. Output ONLY the commit message, no explanations or additional content.
-2. The type must be one of: fix, feat, docs, style, refactor, test, chore, ci, .
-3. The subject must be no longer than 80 characters.
+1. The subject line MUST:
+   - Start with a powerful, precise verb (e.g., restructure, resolve, eliminate, introduce, enforce, migrate, consolidate, decouple)
+   - Be under 72 characters
+   - Convey intent and outcome, not just action. Avoid vague words like "update", "modify", "change", "fix" without specificity
+   - Example: instead of "make base_url optional", write "simplify vendor config by inferring base_url defaults"
+
+2. The body MUST:
+   - Explain the reasoning behind the change
+   - Mention consequences, side effects, or follow-up work if any
+   - NOT simply repeat what the diff already shows
+
+3. Allowed types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+
+4. Output ONLY the commit message, no explanations, no markdown code blocks, no quotes.
 "###;
 pub const PROMPT2: &str = r###"Generate an appropriate conventional commit message based on the output of the git diff --cached command.
 There MUST be only one type and description line.
