@@ -13,9 +13,9 @@ use crate::prompt::Prompt;
 mod git;
 
 /// Safe character limit for sending the full diff.
-const MAX_DIFF_CHARS_FULL: usize = 8_000;
+const MAX_DIFF_CHARS_FULL: usize = 30_000;
 /// Character limit for sending diff headers plus selected code lines.
-const MAX_DIFF_CHARS_SUMMARY: usize = 30_000;
+const MAX_DIFF_CHARS_SUMMARY: usize = 100_000;
 /// Maximum number of code lines retained per file in summary mode.
 const MAX_LINES_PER_FILE: usize = 20;
 
