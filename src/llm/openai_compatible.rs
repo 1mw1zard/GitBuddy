@@ -54,6 +54,9 @@ struct OpenAIResponseUsage {
     completion_tokens: i64,
     prompt_tokens: i64,
     total_tokens: i64,
+    #[serde(rename = "prompt_cache_hit_tokens")]
+    prompt_cache_hit_tokens: Option<i64>,
+
 }
 
 impl OpenAICompatible {
@@ -107,6 +110,7 @@ impl OpenAICompatible {
                 total_tokens: response_json.usage.total_tokens,
                 prompt_tokens: response_json.usage.prompt_tokens,
                 completion_tokens: response_json.usage.completion_tokens,
+                prompt_cache_hit_tokens: response_json.usage.prompt_cache_hit_tokens,
                 model: self.model.clone(),
             })
         } else {

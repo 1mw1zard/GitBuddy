@@ -63,7 +63,11 @@ pub fn handler(
     );
     let prompt_content = build_prompt(&enriched)?;
 
-    println!("{}", "🤖 GitBuddy".bold());
+    println!(
+        "{} {}",
+        "🤖 GitBuddy".bold(),
+        format!("v{}", env!("CARGO_PKG_VERSION")).truecolor(128, 128, 128)
+    );
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".truecolor(128, 128, 128));
     println!();
 
@@ -86,14 +90,26 @@ pub fn handler(
         format!("{}ms", duration.as_millis())
     };
 
+    let cached = llm_result.prompt_cache_hit_tokens.unwrap_or(0);
+    let cached_part = if cached > 0 {
+        format!(" (+ {} cached)", cached)
+    } else {
+        String::new()
+    };
+
     println!();
+    println!(
+        "{} {}",
+        "⏱".truecolor(128, 128, 128),
+        duration_str.truecolor(128, 128, 128)
+    );
     println!(
         "{}",
         format!(
-            "⏱  {}  ·  🪙  {} tokens  ·  📝  {} prompt  ·  ✨  {} completion",
-            duration_str,
+            "Token usage: total={} input={}{} output={}",
             llm_result.total_tokens,
             llm_result.prompt_tokens,
+            cached_part,
             llm_result.completion_tokens
         )
         .truecolor(128, 128, 128)
