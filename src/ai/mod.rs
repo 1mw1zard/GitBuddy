@@ -1,4 +1,6 @@
-use std::time::Instant;
+use std::io::Write;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
@@ -76,16 +78,7 @@ pub fn handler(
     );
 
     let msg = llm_result.commit_message.trim();
-    let max_line_width = msg.lines().map(|l| l.chars().count()).max().unwrap_or(0);
-    let inner_width = max_line_width.max(40);
-
-    println!();
-    println!("  ╭{}╮", "─".repeat(inner_width + 2));
-    for line in msg.lines() {
-        let padded = format!("{:<width$}", line, width = inner_width);
-        println!("  │ {} │", padded.cyan().bold());
-    }
-    println!("  ╰{}╯", "─".repeat(inner_width + 2));
+    print_commit_message(msg)?;
 
     let duration_str = if duration.as_secs() >= 1 {
         format!("{:.2}s", duration.as_secs_f64())
@@ -229,6 +222,53 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
     } else {
         result
     }
+}
+
+fn terminal_width() -> Option<usize> {
+    std::process::Command::new("tput")
+        .arg("cols")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8_lossy(&output.stdout).trim().parse().ok())
+}
+
+fn print_commit_message(msg: &str) -> Result<()> {
+    let max_line_width = msg.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    let inner_width = max_line_width.max(40);
+    let box_width = inner_width + 6; // 2 indent + 2 border + 2 padding
+
+    let term_w = terminal_width().unwrap_or(120);
+
+    if box_width <= term_w {
+        // Terminal is wide enough: draw rounded box with typewriter effect.
+        println!("  ╭{}╮", "─".repeat(inner_width + 2));
+        for line in msg.lines() {
+            let padded = format!("{:<width$}", line, width = inner_width);
+            print!("  │ ");
+            let colored = padded.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!(" │");
+        }
+        println!("  ╰{}╯", "─".repeat(inner_width + 2));
+    } else {
+        // Terminal is too narrow: skip the box, just typewriter-print.
+        println!();
+        for line in msg.lines() {
+            let colored = line.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!();
+        }
+        println!();
+    }
+    Ok(())
 }
 
 fn is_git_directory() -> Result<bool> {
