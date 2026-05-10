@@ -122,19 +122,24 @@ pub fn handler(
     }
 
     git::git_commit(llm_result.commit_message.trim(), dry_run)?;
-    println!(
-        "{} {}",
-        "✅".green().bold(),
-        "Commit successful".green().bold()
-    );
 
-    if push {
+    let should_push = if push {
+        true
+    } else {
+        print!("{} Push to remote? [", "🚀".yellow().bold());
+        print!("{}", "Y".green().bold());
+        print!("/");
+        print!("{}", "n".red());
+        print!("] ");
+        let mut input = String::new();
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim();
+        trimmed == "y" || trimmed == "Y" || trimmed.is_empty()
+    };
+
+    if should_push {
         git::git_push(dry_run)?;
-        println!(
-            "{} {}",
-            "🚀".green().bold(),
-            "Push successful".green().bold()
-        );
     }
 
     Ok(())
