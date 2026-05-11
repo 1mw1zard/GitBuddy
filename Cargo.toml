@@ -1,6 +1,6 @@
 [package]
 name = "gitbuddy"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["W1zard <fujianbang0ops@gmail.com>"]
 description = "An AI-driven tool designed to simplify your Git commit process."
