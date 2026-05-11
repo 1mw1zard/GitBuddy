@@ -1,3 +1,4 @@
+use crate::llm::anthropic_compatible::AnthropicCompatible;
 use crate::llm::openai_compatible::OpenAICompatible;
 use crate::llm::PromptModel;
 
@@ -30,6 +31,15 @@ impl OpenAICompatibleBuilder {
             api_key: self.api_key,
         }
     }
+
+    pub fn build_anthropic(self, prompt: String) -> AnthropicCompatible {
+        AnthropicCompatible {
+            url: self.url,
+            model: self.model,
+            prompt,
+            api_key: self.api_key,
+        }
+    }
 }
 
 fn default_base_url(vendor: PromptModel) -> &'static str {
@@ -37,5 +47,6 @@ fn default_base_url(vendor: PromptModel) -> &'static str {
         PromptModel::OpenAI => "https://api.openai.com",
         PromptModel::DeepSeek => "https://api.deepseek.com",
         PromptModel::Ollama => "http://localhost:11434",
+        PromptModel::MiniMax => "https://api.minimaxi.com/anthropic",
     }
 }
