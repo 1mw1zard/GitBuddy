@@ -23,6 +23,7 @@ pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {
         PromptModel::DeepSeek => config.deepseek = Some(model_config),
         PromptModel::OpenAI => config.openai = Some(model_config),
         PromptModel::Ollama => config.ollama = Some(model_config),
+        PromptModel::MiniMax => config.minimax = Some(model_config),
     }
 
     config.save()?;
@@ -40,6 +41,7 @@ pub struct GlobalConfig {
     pub openai: Option<ModelConfig>,
     pub deepseek: Option<ModelConfig>,
     pub ollama: Option<ModelConfig>,
+    pub minimax: Option<ModelConfig>,
     pub model_parameters: Option<ModelParameters>,
 }
 
@@ -53,6 +55,7 @@ impl GlobalConfig {
             openai: None,
             deepseek: None,
             ollama: None,
+            minimax: None,
             model_parameters: Some(ModelParameters::default()),
         }
     }
@@ -79,6 +82,7 @@ impl GlobalConfig {
             PromptModel::OpenAI => self.openai.as_ref().map(|cfg| (cfg, PromptModel::OpenAI)),
             PromptModel::DeepSeek => self.deepseek.as_ref().map(|cfg| (cfg, PromptModel::DeepSeek)),
             PromptModel::Ollama => self.ollama.as_ref().map(|cfg| (cfg, PromptModel::Ollama)),
+            PromptModel::MiniMax => self.minimax.as_ref().map(|cfg| (cfg, PromptModel::MiniMax)),
         }
     }
 

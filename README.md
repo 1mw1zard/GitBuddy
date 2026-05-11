@@ -99,8 +99,9 @@ gitbuddy ai --vendor openai --model gpt-4o
 | DeepSeek | deepseek v4 flash    |      yes     |   ✓    |
 | Ollama   | ollama               |      yes     |   ✓    |
 | OpenAI   | gpt-3.5-turbo        |      yes     |   ✓    |
+| MiniMax  | MiniMax-M2.7         |      yes     |   ✓    |
 
-> All vendors support arbitrary model names via the `--model` flag, as long as the endpoint is OpenAI-compatible.
+> All vendors support arbitrary model names via the `--model` flag, as long as the endpoint is OpenAI-compatible. MiniMax uses Anthropic-compatible API.
 
 ## Roadmap
 

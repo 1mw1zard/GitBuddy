@@ -1,3 +1,4 @@
+mod anthropic_compatible;
 mod openai_compatible;
 mod openai_compatible_builder;
 
@@ -23,6 +24,9 @@ pub enum PromptModel {
     #[clap(name = "ollama")]
     #[serde(rename = "ollama")]
     Ollama,
+    #[clap(name = "minimax")]
+    #[serde(rename = "minimax")]
+    MiniMax,
 }
 
 impl PromptModel {
@@ -31,6 +35,7 @@ impl PromptModel {
             PromptModel::OpenAI => "gpt-3.5-turbo".to_string(),
             PromptModel::DeepSeek => "deepseek v4 flash".to_string(),
             PromptModel::Ollama => "ollama".to_string(),
+            PromptModel::MiniMax => "MiniMax-M2.7".to_string(),
         }
     }
 }
@@ -82,9 +87,18 @@ fn get_commit_message(
 ) -> Result<LLMResult> {
     let builder = OpenAICompatibleBuilder::new(vendor, model, api_key, base_url);
 
-    let m = builder.build(prompt.value().to_string());
-    let result = m.request(diff_content, option)?;
-    Ok(result)
+    match vendor {
+        PromptModel::MiniMax => {
+            let m = builder.build_anthropic(prompt.value().to_string());
+            let result = m.request(diff_content, option)?;
+            Ok(result)
+        }
+        _ => {
+            let m = builder.build(prompt.value().to_string());
+            let result = m.request(diff_content, option)?;
+            Ok(result)
+        }
+    }
 }
 
 pub fn confirm_commit(_commit_message: &str) -> Result<bool> {
