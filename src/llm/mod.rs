@@ -1,16 +1,15 @@
-mod anthropic_compatible;
-mod openai_compatible;
-mod openai_compatible_builder;
-
-use crate::config;
-use crate::config::ModelParameters;
-use crate::prompt::Prompt;
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use colored::Colorize;
-use openai_compatible_builder::OpenAICompatibleBuilder;
+use futures::StreamExt;
+use rig::client::CompletionClient;
+use rig::completion::{CompletionModel, GetTokenUsage};
+use rig::streaming::StreamedAssistantContent;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+
+use crate::config::{get_config, ModelParameters};
+use crate::prompt::Prompt;
 
 /// Prompt model
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, Serialize)]
@@ -51,54 +50,174 @@ pub struct LLMResult {
     pub model: String,
 }
 
-pub fn llm_request(
+pub async fn llm_request(
     diff_content: &str,
     vendor: Option<PromptModel>,
     model: Option<String>,
     prompt: Prompt,
+    mut on_token: impl FnMut(&str) + Send,
 ) -> Result<LLMResult> {
-    let config = config::get_config()?;
+    let config = get_config()?;
 
     let (model_config, prompt_model) = config
         .model(vendor)
         .ok_or_else(|| anyhow!("No model selected. Run `gitbuddy config` first."))?;
 
-    let model = model.unwrap_or_else(|| model_config.model.clone());
+    let model_name = model.unwrap_or_else(|| model_config.model.clone());
+    let api_key = model_config.api_key.clone().unwrap_or_default();
+    let base_url = model_config.base_url.clone().unwrap_or_default();
+    let option = config.model_params();
 
-    get_commit_message(
-        prompt_model,
-        model.as_str(),
-        model_config.api_key.clone().unwrap_or_default().as_str(),
-        model_config.base_url.as_deref().unwrap_or(""),
-        diff_content,
-        config.model_params(),
-        prompt,
-    )
-}
+    let system_prompt = prompt.value().to_string();
+    let user_prompt = format!("diff content: \n{diff_content}");
 
-fn get_commit_message(
-    vendor: PromptModel,
-    model: &str,
-    api_key: &str,
-    base_url: &str,
-    diff_content: &str,
-    option: ModelParameters,
-    prompt: Prompt,
-) -> Result<LLMResult> {
-    let builder = OpenAICompatibleBuilder::new(vendor, model, api_key, base_url);
-
-    match vendor {
+    match prompt_model {
         PromptModel::MiniMax => {
-            let m = builder.build_anthropic(prompt.value().to_string());
-            let result = m.request(diff_content, option)?;
-            Ok(result)
+            let base_url = if base_url.is_empty() {
+                "https://api.minimaxi.com/anthropic"
+            } else {
+                &base_url
+            };
+            let client = rig::providers::anthropic::Client::builder()
+                .api_key(api_key)
+                .base_url(base_url)
+                .build()?;
+            let model = client.completion_model(model_name.clone());
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
         }
-        _ => {
-            let m = builder.build(prompt.value().to_string());
-            let result = m.request(diff_content, option)?;
-            Ok(result)
+        PromptModel::DeepSeek => {
+            let base_url = if base_url.is_empty() {
+                "https://api.deepseek.com"
+            } else {
+                &base_url
+            };
+            let client = rig::providers::openai::Client::builder()
+                .api_key(api_key)
+                .base_url(base_url)
+                .build()?;
+            let completions_client = client.completions_api();
+            let model = completions_client.completion_model(model_name.clone());
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+        }
+        PromptModel::Ollama => {
+            let base_url = if base_url.is_empty() {
+                "http://localhost:11434"
+            } else {
+                &base_url
+            };
+            let client = rig::providers::openai::Client::builder()
+                .api_key(api_key)
+                .base_url(base_url)
+                .build()?;
+            let completions_client = client.completions_api();
+            let model = completions_client.completion_model(model_name.clone());
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+        }
+        PromptModel::OpenAI => {
+            let mut builder = rig::providers::openai::Client::builder().api_key(api_key);
+            if !base_url.is_empty() {
+                builder = builder.base_url(base_url);
+            }
+            let client = builder.build()?;
+            let completions_client = client.completions_api();
+            let model = completions_client.completion_model(model_name.clone());
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
         }
     }
+}
+
+async fn stream_with_rig<M>(
+    model: M,
+    system_prompt: &str,
+    user_prompt: &str,
+    option: ModelParameters,
+    on_token: &mut (impl FnMut(&str) + Send),
+    model_name: String,
+) -> Result<LLMResult>
+where
+    M: CompletionModel,
+{
+    let mut request = model
+        .completion_request(user_prompt)
+        .preamble(system_prompt.to_string());
+
+    if option.temperature > 0.0 {
+        request = request.temperature(option.temperature);
+    }
+    if option.max_tokens > 0 {
+        request = request.max_tokens(option.max_tokens as u64);
+    }
+
+    let mut additional = serde_json::Map::new();
+    if option.top_p > 0.0 {
+        additional.insert("top_p".to_string(), serde_json::json!(option.top_p));
+    }
+    if option.top_k > 0 {
+        additional.insert("top_k".to_string(), serde_json::json!(option.top_k));
+    }
+    if !additional.is_empty() {
+        request = request.additional_params(serde_json::Value::Object(additional));
+    }
+
+    let request = request.build();
+
+    let mut stream = model
+        .stream(request)
+        .await
+        .map_err(|e| anyhow!("LLM streaming error: {}", e))?;
+
+    let mut full_text = String::new();
+    let mut reasoning_text = String::new();
+    let mut usage_opt = None;
+
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(StreamedAssistantContent::Text(text)) => {
+                on_token(&text.text);
+                full_text.push_str(&text.text);
+            }
+            Ok(StreamedAssistantContent::ReasoningDelta { reasoning, .. }) => {
+                reasoning_text.push_str(&reasoning);
+            }
+            Ok(StreamedAssistantContent::Final(res)) => {
+                usage_opt = res.token_usage();
+            }
+            Err(e) => return Err(anyhow!("Streaming error: {}", e)),
+            _ => {}
+        }
+    }
+
+    if full_text.trim().is_empty() && !reasoning_text.is_empty() {
+        full_text = reasoning_text.clone();
+    }
+
+    let (prompt_tokens, completion_tokens, total_tokens, prompt_cache_hit_tokens) = match usage_opt {
+        Some(u) => (
+            u.input_tokens as i64,
+            u.output_tokens as i64,
+            u.total_tokens as i64,
+            if u.cached_input_tokens > 0 {
+                Some(u.cached_input_tokens as i64)
+            } else {
+                None
+            },
+        ),
+        None => (0, 0, 0, None),
+    };
+
+    Ok(LLMResult {
+        commit_message: full_text,
+        completion_tokens,
+        prompt_tokens,
+        total_tokens,
+        prompt_cache_hit_tokens,
+        reasoning_content: if reasoning_text.is_empty() {
+            None
+        } else {
+            Some(reasoning_text)
+        },
+        model: model_name,
+    })
 }
 
 pub fn confirm_commit(_commit_message: &str) -> Result<bool> {

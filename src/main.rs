@@ -52,19 +52,20 @@ enum Commands {
     },
 }
 
-fn main() {
-    if let Err(e) = run() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run().await {
         eprintln!("{} {}", "Error:".red().bold(), e);
         std::process::exit(1);
     }
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
         Some(Commands::Ai { push, dry_run }) => {
-            ai::handler(*push, *dry_run, false, false, cli.vendor, cli.model.clone(), cli.prompt)?;
+            ai::handler(*push, *dry_run, false, false, cli.vendor, cli.model.clone(), cli.prompt).await?;
         }
         Some(Commands::Config { vendor, api_key, model }) => {
             let model = if let Some(model) = model {
@@ -76,7 +77,7 @@ fn run() -> Result<()> {
             config::handler(vendor, api_key, model.as_str())?;
         }
         None => {
-            ai::handler(false, false, true, true, cli.vendor, cli.model.clone(), cli.prompt)?;
+            ai::handler(false, false, true, true, cli.vendor, cli.model.clone(), cli.prompt).await?;
         }
     }
 
