@@ -47,7 +47,6 @@ pub struct LLMResult {
     pub total_tokens: i64,
     pub prompt_cache_hit_tokens: Option<i64>,
     pub reasoning_content: Option<String>,
-    pub model: String,
 }
 
 pub async fn llm_request(
@@ -83,7 +82,7 @@ pub async fn llm_request(
                 .base_url(base_url)
                 .build()?;
             let model = client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
         }
         PromptModel::DeepSeek => {
             let base_url = if base_url.is_empty() {
@@ -97,7 +96,7 @@ pub async fn llm_request(
                 .build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
         }
         PromptModel::Ollama => {
             let base_url = if base_url.is_empty() {
@@ -111,7 +110,7 @@ pub async fn llm_request(
                 .build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
         }
         PromptModel::OpenAI => {
             let mut builder = rig::providers::openai::Client::builder().api_key(api_key);
@@ -121,7 +120,7 @@ pub async fn llm_request(
             let client = builder.build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token, model_name).await
+            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
         }
     }
 }
@@ -132,7 +131,6 @@ async fn stream_with_rig<M>(
     user_prompt: &str,
     option: ModelParameters,
     on_token: &mut (impl FnMut(&str) + Send),
-    model_name: String,
 ) -> Result<LLMResult>
 where
     M: CompletionModel,
@@ -216,7 +214,6 @@ where
         } else {
             Some(reasoning_text)
         },
-        model: model_name,
     })
 }
 

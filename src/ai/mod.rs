@@ -1,10 +1,12 @@
 use std::io::Write;
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
 use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
+use crate::config;
 use crate::llm;
 use crate::llm::PromptModel;
 use crate::prompt::Prompt;
@@ -88,13 +90,35 @@ pub async fn handler(
     println!("{}", " |___/ ".truecolor(128, 128, 128));
     println!();
 
+    // Pre-resolve the model name so it is printed before streaming starts.
+    let resolved_model = config::get_config()
+        .ok()
+        .and_then(|cfg| {
+            let (mc, _) = cfg.model(vendor)?;
+            Some(model.clone().unwrap_or_else(|| mc.model.clone()))
+        })
+        .unwrap_or_else(|| {
+            vendor
+                .map(|v| v.default_model())
+                .unwrap_or_else(|| "unknown".to_string())
+        });
+    println!("{} {}", "🎯 Model:".truecolor(128, 128, 128), resolved_model.cyan());
+    println!();
+
     let start = Instant::now();
     println!("🧠 Analyzing code changes...");
+    let stat_summary = stats.lines().last().unwrap_or("").trim();
+    if !stat_summary.is_empty() {
+        println!("📊 {}", stat_summary.truecolor(128, 128, 128));
+    }
     println!();
 
     let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt, |token| {
-        print!("{}", token.cyan().bold());
-        std::io::stdout().flush().unwrap();
+        for ch in token.chars() {
+            print!("{}", ch.to_string().cyan().bold());
+            std::io::stdout().flush().unwrap();
+            thread::sleep(Duration::from_millis(5));
+        }
     })
     .await?;
 
@@ -115,8 +139,6 @@ pub async fn handler(
              Try using a standard chat model like 'deepseek-chat'."
         ));
     }
-
-    println!("{} {}", "🎯 Model:".truecolor(128, 128, 128), llm_result.model.cyan());
 
     let duration_str = if duration.as_secs() >= 1 {
         format!("{:.2}s", duration.as_secs_f64())
