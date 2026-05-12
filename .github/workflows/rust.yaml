@@ -91,6 +91,7 @@ jobs:
         run: |
           status="$(
             curl --silent --show-error --output /dev/null --write-out "%{http_code}" \
+              -H "User-Agent: ${{ steps.crate.outputs.name }} (${{ github.repository }})" \
               "https://crates.io/api/v1/crates/${{ steps.crate.outputs.name }}/${{ steps.crate.outputs.version }}"
           )"
 
