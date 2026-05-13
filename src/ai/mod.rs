@@ -110,8 +110,8 @@ pub async fn handler(
     let stat_summary = stats.lines().last().unwrap_or("").trim();
     if !stat_summary.is_empty() {
         println!("📊 {}", stat_summary.truecolor(128, 128, 128));
+        println!();
     }
-    println!();
 
     let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt, |token| {
         for ch in token.chars() {
