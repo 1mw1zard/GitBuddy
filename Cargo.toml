@@ -1,6 +1,6 @@
 [package]
 name = "gitbuddy"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["W1zard <fujianbang0ops@gmail.com>"]
 description = "An AI-driven tool designed to simplify your Git commit process."
@@ -9,7 +9,7 @@ repository = "https://github.com/1mw1zard/gitbuddy"
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json"] }
 serde_json = "1.0.117"
 serde = { version = "1.0.203", features = ["derive"] }
 colored = "2.1.0"
@@ -17,3 +17,6 @@ rust-embed = { version = "8.4.0", features = ["include-exclude"] }
 anyhow = "1.0.86"
 dirs = "5.0.1"
 toml = "0.8.15"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+rig-core = "0.36.0"
