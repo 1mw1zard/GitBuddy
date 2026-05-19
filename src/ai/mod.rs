@@ -6,7 +6,11 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 
 use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
+<<<<<<< Updated upstream
 use crate::config;
+=======
+use crate::commit_message::extract_commit_subject;
+>>>>>>> Stashed changes
 use crate::llm;
 use crate::llm::PromptModel;
 use crate::prompt::Prompt;
@@ -126,8 +130,7 @@ pub async fn handler(
     println!();
     println!();
 
-    let msg = llm_result.commit_message.trim();
-    if msg.is_empty() {
+    if llm_result.commit_message.trim().is_empty() {
         eprintln!("{}", "⚠️  LLM returned an empty commit message.".red().bold());
         if let Some(ref reasoning) = llm_result.reasoning_content {
             eprintln!("{}", "ℹ️  The model produced reasoning content instead:".yellow());
@@ -139,6 +142,11 @@ pub async fn handler(
              Try using a standard chat model like 'deepseek-chat'."
         ));
     }
+<<<<<<< Updated upstream
+=======
+    let msg = extract_commit_subject(&llm_result.commit_message)?;
+    print_commit_message(&msg)?;
+>>>>>>> Stashed changes
 
     let duration_str = if duration.as_secs() >= 1 {
         format!("{:.2}s", duration.as_secs_f64())
@@ -168,12 +176,12 @@ pub async fn handler(
     );
     println!();
 
-    if !auto_commit && !llm::confirm_commit(&llm_result.commit_message)? {
+    if !auto_commit && !llm::confirm_commit(&msg)? {
         println!("{} {}", "❌".red().bold(), "Commit cancelled".red());
         return Ok(());
     }
 
-    git::git_commit(llm_result.commit_message.trim(), dry_run)?;
+    git::git_commit(&msg, dry_run)?;
 
     let should_push = if push {
         true
