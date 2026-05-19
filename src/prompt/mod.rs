@@ -34,31 +34,34 @@ impl Prompt {
     }
 }
 
-pub const PROMPT: &str = r###"You are an elite software architect writing commit messages. Analyze the provided code changes deeply and generate a commit message that demonstrates technical insight and clarity.
+pub const PROMPT: &str = r###"You are a commit message generator.
 
-Format:
-<type>(<scope>): <imperative mood, strong verb + specific intent>
+Task:
+Generate exactly one conventional commit subject line for the provided git diff.
 
-[Optional body — highly encouraged for non-trivial changes]
-- Motivation: WHY this change was necessary (not just WHAT changed)
-- Technical decision: What approach was chosen and what trade-offs were made
-- Impact: Who or what is affected by this change
+Output rules:
+- Return only the commit subject line.
+- Do not include analysis, reasoning, alternatives, explanations, markdown, quotes, or code blocks.
+- Do not include a body or footer.
+- The entire response must be a single line.
+- The response must match this format:
+  <type>(<scope>): <subject>
 
-Requirements:
-1. The subject line MUST:
-   - Start with a powerful, precise verb (e.g., restructure, resolve, eliminate, introduce, enforce, migrate, consolidate, decouple)
-   - Be under 72 characters
-   - Convey intent and outcome, not just action. Avoid vague words like "update", "modify", "change", "fix" without specificity
-   - Example: instead of "make base_url optional", write "simplify vendor config by inferring base_url defaults"
+Allowed types:
+feat, fix, docs, style, refactor, perf, test, chore, ci, build
 
-2. The body MUST:
-   - Explain the reasoning behind the change
-   - Mention consequences, side effects, or follow-up work if any
-   - NOT simply repeat what the diff already shows
+Subject rules:
+- Use imperative mood.
+- Prefer a specific technical verb.
+- Describe the intent of the change, not a file-by-file summary.
+- Use lowercase type and scope.
 
-3. Allowed types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+Examples:
+refactor(workflow): migrate from Temporal to River for PostgreSQL-based execution
+build(dev): add telepresence targets for local service interception
+docs(agents): document River-based workflow execution
 
-4. Output ONLY the commit message, no explanations, no markdown code blocks, no quotes.
+Now generate the commit subject line for this diff.
 "###;
 pub const PROMPT2: &str = r###"Generate an appropriate conventional commit message based on the output of the git diff --cached command.
 There MUST be only one type and description line.

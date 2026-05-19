@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 
 mod ai;
+mod commit_message;
 mod config;
 mod llm;
 mod prompt;
