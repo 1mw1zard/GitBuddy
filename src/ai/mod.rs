@@ -6,11 +6,8 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 
 use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
-<<<<<<< Updated upstream
 use crate::config;
-=======
 use crate::commit_message::extract_commit_subject;
->>>>>>> Stashed changes
 use crate::llm;
 use crate::llm::PromptModel;
 use crate::prompt::Prompt;
@@ -142,11 +139,7 @@ pub async fn handler(
              Try using a standard chat model like 'deepseek-chat'."
         ));
     }
-<<<<<<< Updated upstream
-=======
     let msg = extract_commit_subject(&llm_result.commit_message)?;
-    print_commit_message(&msg)?;
->>>>>>> Stashed changes
 
     let duration_str = if duration.as_secs() >= 1 {
         format!("{:.2}s", duration.as_secs_f64())
