@@ -68,7 +68,7 @@ pub async fn llm_request(
     let option = config.model_params();
 
     let system_prompt = prompt.value().to_string();
-    let user_prompt = format!("diff content: \n{diff_content}");
+    let user_prompt = build_user_prompt(diff_content);
 
     match prompt_model {
         PromptModel::MiniMax => {
@@ -123,6 +123,10 @@ pub async fn llm_request(
             stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
         }
     }
+}
+
+pub(crate) fn build_user_prompt(diff_content: &str) -> String {
+    format!("diff content: \n{diff_content}")
 }
 
 async fn stream_with_rig<M>(

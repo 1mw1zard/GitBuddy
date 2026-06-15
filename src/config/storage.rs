@@ -7,7 +7,7 @@ const DEFAULT_DIR: &str = ".config/gitbuddy";
 const CONFIG_FILE_NAME: &str = "config.toml";
 
 /// get config dir path
-fn get_config_dir() -> Option<PathBuf> {
+pub(crate) fn get_config_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|mut home| {
         home.push(DEFAULT_DIR);
         home
