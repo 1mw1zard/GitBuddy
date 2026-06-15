@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 
 pub use vendor::{DefaultConfig, ModelConfig, ModelParameters};
 
-mod storage;
+pub(crate) mod storage;
 mod vendor;
 
 pub fn handler(vendor: &PromptModel, api_key: &str, model: &str) -> Result<()> {

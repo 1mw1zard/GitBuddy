@@ -1,13 +1,14 @@
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
 use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
-use crate::config;
 use crate::commit_message::extract_commit_subject;
+use crate::config;
 use crate::llm;
 use crate::llm::PromptModel;
 use crate::prompt::Prompt;
@@ -114,6 +115,7 @@ pub async fn handler(
         println!();
     }
 
+    let user_prompt = llm::build_user_prompt(&prompt_content);
     let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt, |token| {
         for ch in token.chars() {
             print!("{}", ch.to_string().cyan().bold());
@@ -139,7 +141,16 @@ pub async fn handler(
              Try using a standard chat model like 'deepseek-chat'."
         ));
     }
-    let msg = extract_commit_subject(&llm_result.commit_message)?;
+    let msg = extract_commit_subject(&llm_result.commit_message).map_err(|err| {
+        invalid_commit_subject_error(
+            &err.to_string(),
+            &llm_result.commit_message,
+            &user_prompt,
+            prompt,
+            &resolved_model,
+        )
+    })?;
+    print_commit_message(&msg)?;
 
     let duration_str = if duration.as_secs() >= 1 {
         format!("{:.2}s", duration.as_secs_f64())
@@ -298,6 +309,140 @@ fn smart_truncate_diff(diff: &str, max_lines: usize) -> String {
     }
 }
 
+fn terminal_width() -> Option<usize> {
+    std::process::Command::new("tput")
+        .arg("cols")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8_lossy(&output.stdout).trim().parse().ok())
+}
+
+fn print_commit_message(msg: &str) -> Result<()> {
+    let max_line_width = msg.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    let inner_width = max_line_width.max(40);
+    let box_width = inner_width + 6; // 2 indent + 2 border + 2 padding
+
+    let term_w = terminal_width().unwrap_or(120);
+
+    if box_width <= term_w {
+        // Terminal is wide enough: draw rounded box with typewriter effect.
+        println!("  ╭{}╮", "─".repeat(inner_width + 2));
+        for line in msg.lines() {
+            let padded = format!("{:<width$}", line, width = inner_width);
+            print!("  │ ");
+            let colored = padded.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!(" │");
+        }
+        println!("  ╰{}╯", "─".repeat(inner_width + 2));
+    } else {
+        // Terminal is too narrow: skip the box, just typewriter-print.
+        println!();
+        for line in msg.lines() {
+            let colored = line.cyan().bold().to_string();
+            for ch in colored.chars() {
+                print!("{}", ch);
+                std::io::stdout().flush()?;
+                thread::sleep(Duration::from_millis(12));
+            }
+            println!();
+        }
+        println!();
+    }
+    Ok(())
+}
+
+fn invalid_commit_subject_error(
+    cause: &str,
+    raw_response: &str,
+    user_prompt: &str,
+    prompt: Prompt,
+    model: &str,
+) -> anyhow::Error {
+    match config::storage::get_config_dir() {
+        Some(config_dir) => {
+            invalid_commit_subject_error_to_dir(cause, raw_response, user_prompt, prompt, model, &config_dir)
+        }
+        None => anyhow!(
+            "{}\nDiagnostic file was not written: failed to resolve config directory.",
+            cause
+        ),
+    }
+}
+
+fn invalid_commit_subject_error_to_dir(
+    cause: &str,
+    raw_response: &str,
+    user_prompt: &str,
+    prompt: Prompt,
+    model: &str,
+    config_dir: &Path,
+) -> anyhow::Error {
+    let content = format_commit_subject_diagnostic(cause, raw_response, user_prompt, prompt, model);
+    match write_commit_subject_diagnostic(config_dir, &content) {
+        Ok(path) => anyhow!("{}\nDiagnostic written to: {}", cause, path.display()),
+        Err(err) => anyhow!("{}\nDiagnostic file was not written: {}", cause, err),
+    }
+}
+
+fn format_commit_subject_diagnostic(
+    cause: &str,
+    raw_response: &str,
+    user_prompt: &str,
+    prompt: Prompt,
+    model: &str,
+) -> String {
+    let created_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    format!(
+        "GitBuddy LLM diagnostic\nCreated at (unix seconds): {}\n\n{}\n\nModel: {}\nPrompt preset: {}\n\nOriginal LLM response:\n{}\n\nOriginal LLM request:\nSystem prompt:\n{}\n\nUser prompt:\n{}",
+        created_at,
+        cause,
+        model,
+        prompt,
+        preview(raw_response),
+        preview(prompt.value()),
+        preview(user_prompt)
+    )
+}
+
+fn write_commit_subject_diagnostic(config_dir: &Path, content: &str) -> Result<PathBuf> {
+    std::fs::create_dir_all(config_dir)
+        .map_err(|err| anyhow!("failed to create config directory '{}': {}", config_dir.display(), err))?;
+
+    let path = config_dir.join(format!("llm-diagnostic-{}.log", diagnostic_timestamp()));
+    std::fs::write(&path, content)
+        .map_err(|err| anyhow!("failed to write diagnostic file '{}': {}", path.display(), err))?;
+
+    Ok(path)
+}
+
+fn diagnostic_timestamp() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
+}
+
+fn preview(value: &str) -> String {
+    const MAX_CHARS: usize = 12_000;
+    let mut chars = value.chars();
+    let preview: String = chars.by_ref().take(MAX_CHARS).collect();
+
+    if chars.next().is_some() {
+        format!("{preview}\n[truncated after {MAX_CHARS} chars]")
+    } else {
+        preview
+    }
+}
+
 fn is_git_directory() -> Result<bool> {
     let output = std::process::Command::new("git")
         .args(["rev-parse", "--is-inside-work-tree"])
@@ -317,4 +462,87 @@ fn is_git_installed() -> bool {
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_subject_diagnostic_includes_llm_request_and_response_context() {
+        let content = format_commit_subject_diagnostic(
+            "LLM did not return a valid conventional commit subject.",
+            "Here is my analysis instead.",
+            "diff content: \ndiff --git a/src/main.rs b/src/main.rs",
+            Prompt::P1,
+            "deepseek-chat",
+        );
+
+        assert!(content.contains("LLM did not return a valid conventional commit subject."));
+        assert!(content.contains("Model: deepseek-chat"));
+        assert!(content.contains("Prompt preset: p1"));
+        assert!(content.contains("Original LLM response:"));
+        assert!(content.contains("Here is my analysis instead."));
+        assert!(content.contains("Original LLM request:"));
+        assert!(content.contains("System prompt:"));
+        assert!(content.contains("User prompt:"));
+        assert!(content.contains("diff --git a/src/main.rs b/src/main.rs"));
+    }
+
+    #[test]
+    fn diagnostic_preview_truncates_large_values() {
+        let value = "a".repeat(12_001);
+
+        let preview = preview(&value);
+
+        let (body, notice) = preview.split_once('\n').unwrap();
+        assert_eq!(body.len(), 12_000);
+        assert!(body.chars().all(|ch| ch == 'a'));
+        assert_eq!(notice, "[truncated after 12000 chars]");
+        assert!(preview.ends_with("[truncated after 12000 chars]"));
+    }
+
+    #[test]
+    fn commit_subject_error_writes_verbose_context_to_diagnostic_file() {
+        let temp_dir = std::env::temp_dir().join("gitbuddy-diagnostic-test").join(uuid());
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let err = invalid_commit_subject_error_to_dir(
+            "LLM did not return a valid conventional commit subject.",
+            "Here is my analysis instead.",
+            "diff content: \ndiff --git a/src/main.rs b/src/main.rs",
+            Prompt::P1,
+            "deepseek-chat",
+            &temp_dir,
+        );
+
+        let msg = err.to_string();
+        assert!(msg.contains("LLM did not return a valid conventional commit subject."));
+        assert!(msg.contains("Diagnostic written to:"));
+        assert!(msg.contains(temp_dir.to_string_lossy().as_ref()));
+        assert!(!msg.contains("Here is my analysis instead."));
+        assert!(!msg.contains("diff --git a/src/main.rs b/src/main.rs"));
+
+        let files: Vec<_> = std::fs::read_dir(&temp_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].extension().and_then(|ext| ext.to_str()), Some("log"));
+
+        let content = std::fs::read_to_string(&files[0]).unwrap();
+        assert!(content.contains("Model: deepseek-chat"));
+        assert!(content.contains("Prompt preset: p1"));
+        assert!(content.contains("Original LLM response:"));
+        assert!(content.contains("Here is my analysis instead."));
+        assert!(content.contains("Original LLM request:"));
+        assert!(content.contains("diff --git a/src/main.rs b/src/main.rs"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    fn uuid() -> String {
+        let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        format!("{}", dur.as_millis())
+    }
 }
