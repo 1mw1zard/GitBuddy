@@ -37,15 +37,15 @@ impl Prompt {
 pub const PROMPT: &str = r###"You are a commit message generator.
 
 Task:
-Generate exactly one conventional commit subject line for the provided git diff.
+Generate exactly one JSON object for the provided git diff.
 
 Output rules:
-- Return only the commit subject line.
+- Return only a JSON object.
 - Do not include analysis, reasoning, alternatives, explanations, markdown, quotes, or code blocks.
 - Do not include a body or footer.
 - The entire response must be a single line.
 - The response must match this format:
-  <type>(<scope>): <subject>
+  {"subject":"<type>(<scope>): <subject>"}
 
 Allowed types:
 feat, fix, docs, style, refactor, perf, test, chore, ci, build
@@ -57,11 +57,11 @@ Subject rules:
 - Use lowercase type and scope.
 
 Examples:
-refactor(workflow): migrate from Temporal to River for PostgreSQL-based execution
-build(dev): add telepresence targets for local service interception
-docs(agents): document River-based workflow execution
+{"subject":"refactor(workflow): migrate from Temporal to River for PostgreSQL-based execution"}
+{"subject":"build(dev): add telepresence targets for local service interception"}
+{"subject":"docs(agents): document River-based workflow execution"}
 
-Now generate the commit subject line for this diff.
+Now generate the JSON object for this diff.
 "###;
 pub const PROMPT2: &str = r###"Generate an appropriate conventional commit message based on the output of the git diff --cached command.
 There MUST be only one type and description line.
@@ -172,3 +172,19 @@ const PROMPT5: &str = "Generate a concise commit message based on \
               'build' (build system), 'chore' (chores), 'ci' (continuous integration), \
               'docs' (documentation), 'feat' (new feature), 'fix' (fix), 'perf' (performance),\
                'refactor' (refactoring), 'style' (style), 'test' (test):";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_prompt_requests_json_subject_object() {
+        let prompt = Prompt::P1.value();
+
+        assert!(prompt.contains("Return only a JSON object."));
+        assert!(prompt.contains(r#"{"subject":"<type>(<scope>): <subject>"}"#));
+        assert!(prompt.contains(
+            r#"{"subject":"refactor(workflow): migrate from Temporal to River for PostgreSQL-based execution"}"#
+        ));
+    }
+}
