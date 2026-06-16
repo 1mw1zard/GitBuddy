@@ -3,21 +3,23 @@
 [![Rust CI](https://github.com/1mw1zard/GitBuddy/actions/workflows/rust.yaml/badge.svg)](https://github.com/1mw1zard/GitBuddy/actions/workflows/rust.yaml)
 [![codecov](https://codecov.io/github/1mw1zard/gitbuddy/graph/badge.svg?token=PA0ZIXIGI5)](https://codecov.io/github/1mw1zard/gitbuddy)
 
-GitBuddy is an AI-driven tool designed to simplify your Git commit process. With GitBuddy, you can generate meaningful
-commit messages, streamline your workflow, and enhance your productivity.
+GitBuddy is an AI-driven CLI that generates Conventional Commit messages from your staged Git diff. It can preview the
+message, commit for you, optionally push, and fall back to auto-staging when you run `gitbuddy` with no subcommand.
 
 > [!WARNING]
 > This project is currently in **development**.
 
 ## Features
 
-- **AI-Powered Commit Messages**: Generate intelligent and context-aware commit messages based on your code changes.
-- **Customizable Models**: Support for using different AI models, not only GPT-3.5.
-- **Multiple Vendor Flexibility**: Compatible with various AI service providers.
-- **Multiple Built-in Prompts**: Choose from 5 built-in prompt presets (P1–P5) to tailor commit message style.
-- **Smart Diff Truncation**: Automatically truncates large diffs to fit within model context windows.
-- **Seamless Integration**: Works seamlessly with your existing Git workflow.
-- **Improved Productivity**: Spend less time thinking about commit messages and more time coding.
+- **AI-powered commit subjects**: Generate a single Conventional Commit subject from the current staged diff.
+- **JSON-first default prompt**: The default prompt asks models to return `{"subject":"..."}` for easier parsing.
+- **Repair fallback**: If a model returns analysis, markdown, or malformed output, GitBuddy retries with a repair prompt.
+- **Multiple vendors**: Supports DeepSeek, OpenAI-compatible endpoints, Ollama, and MiniMax.
+- **Runtime overrides**: Temporarily switch vendor, model, or prompt preset without rewriting your saved config.
+- **Smart diff truncation**: Uses the full diff for normal changes, compact summaries for large diffs, and stats for very
+  large diffs.
+- **Failure diagnostics**: Writes detailed invalid-response diagnostics to your GitBuddy config directory while keeping the
+  terminal error short.
 
 ## Installation
 
@@ -39,36 +41,42 @@ cargo install --force gitbuddy
 
 ### Configuration
 
-To use GitBuddy, simply run the following command in your terminal:
+GitBuddy stores configuration in `~/.config/gitbuddy/config.toml`.
 
-**Using default model**
+Configure a vendor with its default model:
 
 ```sh
 gitbuddy config --api-key <your-api-key> deepseek
 ```
 
-**Using custom model**
+Configure a specific model:
 
 ```sh
 gitbuddy config --api-key <your-api-key> --model gpt-4o openai
 ```
 
+For local Ollama, the API key can be any non-empty placeholder:
+
+```sh
+gitbuddy config --api-key local --model llama3.1 ollama
+```
+
 ## Usage
 
-Using GitBuddy is straightforward. After making your changes, run the following command to generate a commit message:
+After staging your changes, run:
 
 ```sh
 gitbuddy ai
 ```
 
-Or simply run `gitbuddy` for auto-stage and auto-commit mode.
+Or run `gitbuddy` with no subcommand to auto-stage all changes and auto-commit without an extra confirmation prompt.
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `--push` | Push the commit to the remote repository after committing. |
-| `--dry-run` | Generate the commit message without actually creating the commit. |
+| `--push` | Push the commit to the remote repository after committing. Without this flag, GitBuddy asks before pushing. |
+| `--dry-run` | Generate the commit message and print the Git commands without creating a commit or pushing. |
 | `--prompt <P>`, `-p <P>` | Select a built-in prompt preset: `P1`, `P2`, `P3`, `P4`, or `P5` (default: `P1`). |
 | `--vendor <VENDOR>` | Temporarily override the default vendor for this run. |
 | `--model <MODEL>`, `-m <MODEL>` | Temporarily override the model for this run. |
@@ -79,7 +87,7 @@ Or simply run `gitbuddy` for auto-stage and auto-commit mode.
 # Auto-stage all changes, generate message, and auto-commit
 gitbuddy
 
-# Generate message from staged changes, confirm, commit, and push
+# Generate a message from staged changes, confirm before committing, and push
 gitbuddy ai --push
 
 # Preview the generated message without committing
@@ -92,6 +100,21 @@ gitbuddy ai -p P3
 gitbuddy ai --vendor openai --model gpt-4o
 ```
 
+## Commit Message Format
+
+The default `P1` prompt expects the model to return a JSON object with a single `subject` field:
+
+```json
+{"subject":"fix(ai): repair malformed commit subject output"}
+```
+
+GitBuddy extracts and validates the subject before committing. Accepted commit types are `feat`, `fix`, `docs`, `style`,
+`refactor`, `perf`, `test`, `chore`, `ci`, and `build`.
+
+If the response cannot be parsed, GitBuddy sends a second repair request. If repair also fails, it writes a diagnostic log
+such as `~/.config/gitbuddy/llm-diagnostic-<timestamp>.log` with the model name, prompt preset, original response, repair
+response, and prompt previews.
+
 ## Support models
 
 | Vendor   | Default Model        | Custom Model | Status |
@@ -101,7 +124,27 @@ gitbuddy ai --vendor openai --model gpt-4o
 | OpenAI   | gpt-3.5-turbo        |      yes     |   ✓    |
 | MiniMax  | MiniMax-M2.7         |      yes     |   ✓    |
 
-> All vendors support arbitrary model names via the `--model` flag, as long as the endpoint is OpenAI-compatible. MiniMax uses Anthropic-compatible API.
+DeepSeek, OpenAI, and Ollama use OpenAI-compatible APIs. MiniMax uses an Anthropic-compatible API. All vendors support
+custom model names via `gitbuddy config --model ...` or the runtime `--model` flag.
+
+Default endpoints are:
+
+| Vendor | Default endpoint |
+|--------|------------------|
+| DeepSeek | `https://api.deepseek.com` |
+| Ollama | `http://localhost:11434` |
+| MiniMax | `https://api.minimaxi.com/anthropic` |
+| OpenAI | OpenAI SDK default endpoint |
+
+## Troubleshooting
+
+- **`Config not found. Run gitbuddy config first.`**: Configure at least one vendor before running `gitbuddy ai`.
+- **`No files added to staging!`**: `gitbuddy ai` reads staged changes. Run `git add ...` first, or run `gitbuddy` to
+  auto-stage all changes.
+- **`LLM did not return a valid conventional commit subject.`**: Check the diagnostic file path printed in the terminal.
+  The log is written under `~/.config/gitbuddy/` and includes the raw model output plus prompt previews.
+- **Empty message from a reasoning model**: Use a standard chat model, for example `deepseek-chat`, instead of a model that
+  returns only reasoning content.
 
 ## Roadmap
 

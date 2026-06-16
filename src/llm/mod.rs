@@ -11,6 +11,18 @@ use std::io::Write;
 use crate::config::{get_config, ModelParameters};
 use crate::prompt::Prompt;
 
+const REPAIR_SYSTEM_PROMPT: &str = r###"You repair malformed commit message outputs.
+
+Task:
+Return exactly one JSON object with a single field named subject.
+
+Rules:
+- subject must be a single conventional commit subject line.
+- Do not include analysis, markdown, code fences, explanations, or extra fields.
+- Return only JSON.
+- Example: {"subject":"fix(ai): handle invalid json response"}
+"###;
+
 /// Prompt model
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, Serialize)]
 pub enum PromptModel {
@@ -57,6 +69,39 @@ pub async fn llm_request(
     mut on_token: impl FnMut(&str) + Send,
 ) -> Result<LLMResult> {
     let config = get_config()?;
+    let option = config.model_params();
+    let system_prompt = prompt.value().to_string();
+    let user_prompt = build_user_prompt(diff_content);
+    llm_request_with_prompts(&system_prompt, &user_prompt, vendor, model, option, &mut on_token).await
+}
+
+pub async fn repair_commit_subject_request(
+    raw_response: &str,
+    original_user_prompt: &str,
+    parse_error: &str,
+    vendor: Option<PromptModel>,
+    model: Option<String>,
+) -> Result<LLMResult> {
+    llm_request_with_prompts(
+        REPAIR_SYSTEM_PROMPT,
+        &build_repair_user_prompt(raw_response, original_user_prompt, parse_error),
+        vendor,
+        model,
+        repair_model_params(),
+        |_| {},
+    )
+    .await
+}
+
+async fn llm_request_with_prompts(
+    system_prompt: &str,
+    user_prompt: &str,
+    vendor: Option<PromptModel>,
+    model: Option<String>,
+    option: ModelParameters,
+    mut on_token: impl FnMut(&str) + Send,
+) -> Result<LLMResult> {
+    let config = get_config()?;
 
     let (model_config, prompt_model) = config
         .model(vendor)
@@ -65,10 +110,6 @@ pub async fn llm_request(
     let model_name = model.unwrap_or_else(|| model_config.model.clone());
     let api_key = model_config.api_key.clone().unwrap_or_default();
     let base_url = model_config.base_url.clone().unwrap_or_default();
-    let option = config.model_params();
-
-    let system_prompt = prompt.value().to_string();
-    let user_prompt = build_user_prompt(diff_content);
 
     match prompt_model {
         PromptModel::MiniMax => {
@@ -82,7 +123,7 @@ pub async fn llm_request(
                 .base_url(base_url)
                 .build()?;
             let model = client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
+            stream_with_rig(model, system_prompt, user_prompt, option, &mut on_token).await
         }
         PromptModel::DeepSeek => {
             let base_url = if base_url.is_empty() {
@@ -96,7 +137,7 @@ pub async fn llm_request(
                 .build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
+            stream_with_rig(model, system_prompt, user_prompt, option, &mut on_token).await
         }
         PromptModel::Ollama => {
             let base_url = if base_url.is_empty() {
@@ -110,7 +151,7 @@ pub async fn llm_request(
                 .build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
+            stream_with_rig(model, system_prompt, user_prompt, option, &mut on_token).await
         }
         PromptModel::OpenAI => {
             let mut builder = rig::providers::openai::Client::builder().api_key(api_key);
@@ -120,13 +161,45 @@ pub async fn llm_request(
             let client = builder.build()?;
             let completions_client = client.completions_api();
             let model = completions_client.completion_model(model_name.clone());
-            stream_with_rig(model, &system_prompt, &user_prompt, option, &mut on_token).await
+            stream_with_rig(model, system_prompt, user_prompt, option, &mut on_token).await
         }
     }
 }
 
 pub(crate) fn build_user_prompt(diff_content: &str) -> String {
     format!("diff content: \n{diff_content}")
+}
+
+pub(crate) fn build_repair_user_prompt(raw_response: &str, original_user_prompt: &str, parse_error: &str) -> String {
+    format!(
+        "The previous model response could not be parsed as a valid conventional commit subject.\n\
+Parse error: {parse_error}\n\n\
+Previous model response:\n{}\n\n\
+Original user prompt:\n{}\n\n\
+Return only JSON in this exact shape: {{\"subject\":\"<type>(<scope>): <subject>\"}}",
+        preview(raw_response, 12_000),
+        preview(original_user_prompt, 12_000)
+    )
+}
+
+fn repair_model_params() -> ModelParameters {
+    ModelParameters {
+        temperature: 0.0,
+        top_p: 0.0,
+        top_k: 0,
+        max_tokens: 128,
+    }
+}
+
+fn preview(value: &str, max_chars: usize) -> String {
+    let mut chars = value.chars();
+    let preview: String = chars.by_ref().take(max_chars).collect();
+
+    if chars.next().is_some() {
+        format!("{preview}\n[truncated after {max_chars} chars]")
+    } else {
+        preview
+    }
 }
 
 async fn stream_with_rig<M>(
@@ -233,4 +306,44 @@ pub fn confirm_commit(_commit_message: &str) -> Result<bool> {
     std::io::stdin().read_line(&mut input)?;
 
     Ok(input.trim() == "y" || input.trim() == "Y" || input.trim() == "")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repair_prompt_contains_parse_error_response_and_original_prompt() {
+        let prompt = build_repair_user_prompt(
+            "Here is my analysis instead.",
+            "diff content: \ndiff --git a/src/main.rs b/src/main.rs",
+            "LLM did not return a valid conventional commit subject.",
+        );
+
+        assert!(prompt.contains("Parse error: LLM did not return a valid conventional commit subject."));
+        assert!(prompt.contains("Previous model response:"));
+        assert!(prompt.contains("Here is my analysis instead."));
+        assert!(prompt.contains("Original user prompt:"));
+        assert!(prompt.contains("diff --git a/src/main.rs b/src/main.rs"));
+        assert!(prompt.contains(r#"{"subject":"<type>(<scope>): <subject>"}"#));
+    }
+
+    #[test]
+    fn repair_prompt_truncates_large_values() {
+        let raw_response = "a".repeat(12_001);
+        let original_prompt = "b".repeat(12_001);
+
+        let prompt = build_repair_user_prompt(&raw_response, &original_prompt, "parse failed");
+
+        assert!(prompt.contains("[truncated after 12000 chars]"));
+        assert!(!prompt.contains(&"a".repeat(12_001)));
+        assert!(!prompt.contains(&"b".repeat(12_001)));
+    }
+
+    #[test]
+    fn repair_user_prompt_mentions_json_shape() {
+        let prompt = build_repair_user_prompt("bad", "diff", "parse failed");
+
+        assert!(prompt.contains(r#"Return only JSON in this exact shape: {"subject":"<type>(<scope>): <subject>"}"#));
+    }
 }

@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 
 use crate::ai::git::{git_add_all, git_stage_diff, git_stage_filenames, git_stage_stats, has_unstaged_changes};
-use crate::commit_message::extract_commit_subject;
+use crate::commit_message::extract_commit_subject_from_json_or_text;
 use crate::config;
 use crate::llm;
 use crate::llm::PromptModel;
@@ -116,7 +116,7 @@ pub async fn handler(
     }
 
     let user_prompt = llm::build_user_prompt(&prompt_content);
-    let llm_result = llm::llm_request(&prompt_content, vendor, model, prompt, |token| {
+    let llm_result = llm::llm_request(&prompt_content, vendor, model.clone(), prompt, |token| {
         for ch in token.chars() {
             print!("{}", ch.to_string().cyan().bold());
             std::io::stdout().flush().unwrap();
@@ -141,15 +141,51 @@ pub async fn handler(
              Try using a standard chat model like 'deepseek-chat'."
         ));
     }
-    let msg = extract_commit_subject(&llm_result.commit_message).map_err(|err| {
-        invalid_commit_subject_error(
-            &err.to_string(),
-            &llm_result.commit_message,
-            &user_prompt,
-            prompt,
-            &resolved_model,
-        )
-    })?;
+    let msg = match extract_commit_subject_from_json_or_text(&llm_result.commit_message) {
+        Ok(msg) => msg,
+        Err(err) => {
+            eprintln!(
+                "{}",
+                "⚠️  LLM response did not match the required format. Attempting repair...".yellow()
+            );
+            let repair_prompt =
+                llm::build_repair_user_prompt(&llm_result.commit_message, &user_prompt, &err.to_string());
+            let repair_result = match llm::repair_commit_subject_request(
+                &llm_result.commit_message,
+                &user_prompt,
+                &err.to_string(),
+                vendor,
+                model.clone(),
+            )
+            .await
+            {
+                Ok(repair_result) => repair_result,
+                Err(repair_err) => {
+                    return Err(invalid_commit_subject_error(
+                        &format!("{}\nRepair request failed: {}", err, repair_err),
+                        &llm_result.commit_message,
+                        None,
+                        Some(&repair_prompt),
+                        &user_prompt,
+                        prompt,
+                        &resolved_model,
+                    ));
+                }
+            };
+
+            extract_commit_subject_from_json_or_text(&repair_result.commit_message).map_err(|repair_err| {
+                invalid_commit_subject_error(
+                    &format!("{}\nRepair attempt also failed: {}", err, repair_err),
+                    &llm_result.commit_message,
+                    Some(&repair_result.commit_message),
+                    Some(&repair_prompt),
+                    &user_prompt,
+                    prompt,
+                    &resolved_model,
+                )
+            })?
+        }
+    };
     print_commit_message(&msg)?;
 
     let duration_str = if duration.as_secs() >= 1 {
@@ -359,14 +395,23 @@ fn print_commit_message(msg: &str) -> Result<()> {
 fn invalid_commit_subject_error(
     cause: &str,
     raw_response: &str,
+    repair_response: Option<&str>,
+    repair_prompt: Option<&str>,
     user_prompt: &str,
     prompt: Prompt,
     model: &str,
 ) -> anyhow::Error {
     match config::storage::get_config_dir() {
-        Some(config_dir) => {
-            invalid_commit_subject_error_to_dir(cause, raw_response, user_prompt, prompt, model, &config_dir)
-        }
+        Some(config_dir) => invalid_commit_subject_error_to_dir(
+            cause,
+            raw_response,
+            repair_response,
+            repair_prompt,
+            user_prompt,
+            prompt,
+            model,
+            &config_dir,
+        ),
         None => anyhow!(
             "{}\nDiagnostic file was not written: failed to resolve config directory.",
             cause
@@ -377,12 +422,22 @@ fn invalid_commit_subject_error(
 fn invalid_commit_subject_error_to_dir(
     cause: &str,
     raw_response: &str,
+    repair_response: Option<&str>,
+    repair_prompt: Option<&str>,
     user_prompt: &str,
     prompt: Prompt,
     model: &str,
     config_dir: &Path,
 ) -> anyhow::Error {
-    let content = format_commit_subject_diagnostic(cause, raw_response, user_prompt, prompt, model);
+    let content = format_commit_subject_diagnostic(
+        cause,
+        raw_response,
+        repair_response,
+        repair_prompt,
+        user_prompt,
+        prompt,
+        model,
+    );
     match write_commit_subject_diagnostic(config_dir, &content) {
         Ok(path) => anyhow!("{}\nDiagnostic written to: {}", cause, path.display()),
         Err(err) => anyhow!("{}\nDiagnostic file was not written: {}", cause, err),
@@ -392,6 +447,8 @@ fn invalid_commit_subject_error_to_dir(
 fn format_commit_subject_diagnostic(
     cause: &str,
     raw_response: &str,
+    repair_response: Option<&str>,
+    repair_prompt: Option<&str>,
     user_prompt: &str,
     prompt: Prompt,
     model: &str,
@@ -401,13 +458,22 @@ fn format_commit_subject_diagnostic(
         .map(|duration| duration.as_secs().to_string())
         .unwrap_or_else(|_| "unknown".to_string());
 
+    let repair_section = repair_response
+        .map(|repair| format!("\n\nRepair LLM response:\n{}", preview(repair)))
+        .unwrap_or_default();
+    let repair_prompt_section = repair_prompt
+        .map(|repair_prompt| format!("\n\nRepair prompt:\n{}", preview(repair_prompt)))
+        .unwrap_or_default();
+
     format!(
-        "GitBuddy LLM diagnostic\nCreated at (unix seconds): {}\n\n{}\n\nModel: {}\nPrompt preset: {}\n\nOriginal LLM response:\n{}\n\nOriginal LLM request:\nSystem prompt:\n{}\n\nUser prompt:\n{}",
+        "GitBuddy LLM diagnostic\nCreated at (unix seconds): {}\n\n{}\n\nModel: {}\nPrompt preset: {}\n\nOriginal LLM response:\n{}{}{}\n\nOriginal LLM request:\nSystem prompt:\n{}\n\nUser prompt:\n{}",
         created_at,
         cause,
         model,
         prompt,
         preview(raw_response),
+        repair_section,
+        repair_prompt_section,
         preview(prompt.value()),
         preview(user_prompt)
     )
@@ -432,7 +498,7 @@ fn diagnostic_timestamp() -> u128 {
 }
 
 fn preview(value: &str) -> String {
-    const MAX_CHARS: usize = 12_000;
+    const MAX_CHARS: usize = 50_000;
     let mut chars = value.chars();
     let preview: String = chars.by_ref().take(MAX_CHARS).collect();
 
@@ -473,6 +539,8 @@ mod tests {
         let content = format_commit_subject_diagnostic(
             "LLM did not return a valid conventional commit subject.",
             "Here is my analysis instead.",
+            Some(r#"{"subject":"fix(ai): repair malformed response"}"#),
+            Some(r#"Return only JSON in this exact shape: {"subject":"<type>(<scope>): <subject>"}"#),
             "diff content: \ndiff --git a/src/main.rs b/src/main.rs",
             Prompt::P1,
             "deepseek-chat",
@@ -483,6 +551,10 @@ mod tests {
         assert!(content.contains("Prompt preset: p1"));
         assert!(content.contains("Original LLM response:"));
         assert!(content.contains("Here is my analysis instead."));
+        assert!(content.contains("Repair LLM response:"));
+        assert!(content.contains(r#"{"subject":"fix(ai): repair malformed response"}"#));
+        assert!(content.contains("Repair prompt:"));
+        assert!(content.contains("Return only JSON in this exact shape"));
         assert!(content.contains("Original LLM request:"));
         assert!(content.contains("System prompt:"));
         assert!(content.contains("User prompt:"));
@@ -491,15 +563,15 @@ mod tests {
 
     #[test]
     fn diagnostic_preview_truncates_large_values() {
-        let value = "a".repeat(12_001);
+        let value = "a".repeat(50_001);
 
         let preview = preview(&value);
 
         let (body, notice) = preview.split_once('\n').unwrap();
-        assert_eq!(body.len(), 12_000);
+        assert_eq!(body.len(), 50_000);
         assert!(body.chars().all(|ch| ch == 'a'));
-        assert_eq!(notice, "[truncated after 12000 chars]");
-        assert!(preview.ends_with("[truncated after 12000 chars]"));
+        assert_eq!(notice, "[truncated after 50000 chars]");
+        assert!(preview.ends_with("[truncated after 50000 chars]"));
     }
 
     #[test]
@@ -510,6 +582,8 @@ mod tests {
         let err = invalid_commit_subject_error_to_dir(
             "LLM did not return a valid conventional commit subject.",
             "Here is my analysis instead.",
+            Some(r#"{"subject":"fix(ai): repair malformed response"}"#),
+            Some(r#"Return only JSON in this exact shape: {"subject":"<type>(<scope>): <subject>"}"#),
             "diff content: \ndiff --git a/src/main.rs b/src/main.rs",
             Prompt::P1,
             "deepseek-chat",
@@ -535,6 +609,10 @@ mod tests {
         assert!(content.contains("Prompt preset: p1"));
         assert!(content.contains("Original LLM response:"));
         assert!(content.contains("Here is my analysis instead."));
+        assert!(content.contains("Repair LLM response:"));
+        assert!(content.contains(r#"{"subject":"fix(ai): repair malformed response"}"#));
+        assert!(content.contains("Repair prompt:"));
+        assert!(content.contains("Return only JSON in this exact shape"));
         assert!(content.contains("Original LLM request:"));
         assert!(content.contains("diff --git a/src/main.rs b/src/main.rs"));
 
